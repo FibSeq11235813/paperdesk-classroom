@@ -1,0 +1,1 @@
+ALTER TABLE slides ADD COLUMN pdf_key TEXT;
