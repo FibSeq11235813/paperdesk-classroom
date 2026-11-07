@@ -1,5 +1,5 @@
 import {createServer} from "node:http";
-import {randomBytes,createHash,timingSafeEqual} from "node:crypto";
+import {randomBytes,randomInt,createHash,timingSafeEqual} from "node:crypto";
 import {mkdirSync,createReadStream} from "node:fs";
 import {stat} from "node:fs/promises";
 import {resolve,extname,sep,join} from "node:path";
@@ -88,14 +88,21 @@ async function api(req,res,path) {
     if (!body || typeof body!=="object") fail(400,"Invalid request.");
     if(process.env.TEACHER_PASSWORD && hash(body.password||"")!==hash(process.env.TEACHER_PASSWORD))fail(403,"Enter the teacher password.");
     const title=label(body.title,90,"Untitled lesson");
-    const code=randomBytes(6).toString("hex");
+    const alphabet="abcdefghjkmnpqrstuvwxyz23456789";
+    let code;
+    for(let attempt=0;attempt<100;attempt++){
+      const candidate=Array.from({length:4},()=>alphabet[randomInt(alphabet.length)]).join("");
+      if(!query.room.get(candidate)){code=candidate;break;}
+    }
+    if(!code)fail(503,"Could not allocate a class code. Please try again.");
     const token=randomBytes(32).toString("base64url");
     query.create.run(code,title,hash(token));
     return send(res,201,{code,title,token});
   }
-  const match=/^\/api\/rooms\/([a-f0-9]{12})(?:\/(slides|submissions)(?:\/([1-9]\d{0,12})(?:\/(pdf))?)?)?$/.exec(path);
+  const match=/^\/api\/rooms\/([a-z0-9]{4}|[a-f0-9]{12})(?:\/(slides|submissions)(?:\/([1-9]\d{0,12})(?:\/(pdf))?)?)?$/i.exec(path);
   if(!match) fail(404,"Unknown endpoint.");
-  const [,code,section,id,format]=match;
+  const [,rawCode,section,id,format]=match;
+  const code=rawCode.toLowerCase();
   if(format&&section!=="slides")fail(404,"Unknown endpoint.");
   const room=query.room.get(code);
   if(!room) fail(404,"Class session was not found or has been ended.");
