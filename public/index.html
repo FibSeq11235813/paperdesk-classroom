@@ -14,18 +14,29 @@
   <button id="resume" hidden>Resume teaching</button>
 </section>
 <section id="teacher" hidden>
-  <div class="heading"><div><p class="eyebrow">Teacher desk</p><h1 id="teacherTitle"></h1></div><button id="end">End class</button></div>
-  <div class="joinbar"><div><b>Student join code</b> <code id="roomCode"></code></div><button id="copy">Copy student link</button><input id="joinLink" aria-label="Student join link" readonly></div>
+  <div class="teacher-topbar">
+    <div class="lesson-heading"><span class="eyebrow">Teacher desk</span><h1 id="teacherTitle"></h1></div>
+    <div class="class-code">Join <code id="roomCode"></code><button id="copy">Copy student link</button></div>
+    <button id="classPanelToggle" aria-expanded="false" aria-controls="classPanel">Class panel</button><button id="end">End class</button>
+  </div>
   <div class="teacher-layout">
-    <section class="panel preview"><div class="actions view-tabs"><button id="teacherSlideTab" aria-pressed="true">Slides</button><button id="teacherGraphTab" aria-pressed="false">Graph</button></div><div id="teacherSlidePanel"><h2>Teacher workspace</h2><p>Preview pages privately. Use Present this page to send one to your clean screen, or Reveal to class to give students a copy.</p>
-      <label class="file-label">Choose PDF <input type="file" id="pdf" accept=".pdf,application/pdf"></label><button id="example">Open example deck</button>
-      <div class="actions"><button id="prev" disabled>Previous</button><output id="sourcePage">No PDF open</output><button id="next" disabled>Next</button>
-      <button id="reveal" class="primary" disabled>Reveal to class</button><button id="presentPage" disabled>Present this page</button><button id="openPresentation">Open clean screen</button><button id="downloadPDF" disabled>Download annotated page</button></div>
-      <div id="teacherBoard"></div>
-    </div><div id="teacherGraphPanel" hidden><h2>Graph desk</h2><div id="teacherGraph"></div><button id="revealGraph" class="primary">Reveal graph to class</button></div>
+    <section class="panel preview">
+      <div class="actions view-tabs"><button id="teacherSlideTab" aria-pressed="true">Slides</button><button id="teacherGraphTab" aria-pressed="false">Graph</button></div>
+      <div id="teacherSlidePanel">
+        <div class="pdf-navigation" role="toolbar" aria-label="PDF navigation and sharing">
+          <label class="pdf-upload" title="Open PDF"><span id="uploadIcon"></span><span>Open PDF</span><input type="file" id="pdf" accept=".pdf,application/pdf"></label>
+          <div class="page-navigation"><button id="prev" disabled>Previous page</button><output id="sourcePage">No PDF open</output><label class="page-jump-label">Go to <input id="pageJump" type="number" min="1" value="1" aria-label="Go to PDF page" disabled></label><button id="next" disabled>Next page</button></div>
+          <div class="pdf-share-actions"><button id="reveal" class="primary" disabled>Reveal to class</button><button id="presentPage" disabled>Present this page</button><button id="openPresentation">Open clean screen</button><button id="downloadPDF" disabled>Download annotated page</button></div>
+        </div>
+        <div id="teacherBoard"></div>
+      </div>
+      <div id="teacherGraphPanel" hidden><h2>Graph desk</h2><div id="teacherGraph"></div><button id="revealGraph" class="primary">Reveal graph to class</button></div>
     </section>
-    <div class="sidebar"><section class="panel"><h2>Revealed slides</h2><ol id="revealed"></ol></section>
-    <section class="panel"><h2>Shared work</h2><p id="shareEmpty">Student pages appear here when shared.</p><ul id="inbox"></ul></section></div>
+    <aside class="sidebar" id="classPanel" hidden>
+      <section class="panel"><h2>Class controls</h2><p>Browse pages privately. Present sends your selected page to the clean screen; Reveal gives students their own copy.</p><input id="joinLink" aria-label="Student join link" readonly><button id="example">Open example deck</button></section>
+      <section class="panel"><h2>Revealed slides</h2><ol id="revealed"></ol></section>
+      <section class="panel"><h2>Shared work</h2><p id="shareEmpty">Student pages appear here when shared.</p><ul id="inbox"></ul></section>
+    </aside>
   </div>
 </section>
 <section id="student" hidden>

@@ -1,3 +1,4 @@
+import {icon,iconButton} from "./ui-icons.mjs";
 import {frameForPage,standardSlideFrame} from "./presentation-frame.mjs";
 import {createGraph} from "./graph.mjs";
 import {createWhiteboard,loadPDF,bytesToBase64} from "./whiteboard.mjs";
@@ -38,6 +39,8 @@ const workKey=(id=state.current)=>"paperdesk.classroom.work."+state.room+"."+id;
 const shortName=name=>name.trim().slice(0,50)||"Student";
 const cleanCode=code=>code.trim().toLowerCase().replace(/[\s-]/g,"");
 function show(section){
+  document.body.classList.toggle("workspace-active",section!=="landing");
+  document.body.dataset.workspace=section;
   for(const id of ["landing","teacher","student"]) $(id).hidden=id!==section;
   notice("");
 }
@@ -170,6 +173,7 @@ async function openPDF(file) {
   if(!file)return;
   if(file.size>80_000_000){notice("Choose a PDF under 80 MB.");return;}
   const version=++state.render;
+  $("pageJump").disabled=true;
   for(const id of ["reveal","prev","next","presentPage","downloadPDF"])$(id).disabled=true;
   $("sourcePage").textContent="Opening…";
   try {
@@ -207,11 +211,23 @@ async function renderPage(){
     await teacherBoard.setSource({page,bytes:pdfBytes,pageNumber:state.page},saved.marks||[],{crop,defaultCrop});
     if(version!==state.render)return;
     $("sourcePage").textContent="Page "+state.page+" / "+state.pdf.numPages;
+    $("pageJump").disabled=false;$("pageJump").max=state.pdf.numPages;$("pageJump").value=state.page;
     $("prev").disabled=state.page<=1;$("next").disabled=state.page>=state.pdf.numPages;
     $("reveal").disabled=$("presentPage").disabled=$("downloadPDF").disabled=false;notice("");
     // Browsing a different page is private until Present this page is clicked.
   }catch(error){if(version===state.render)notice("Could not render this page.");console.error(error);}
 }
+$("classPanelToggle").onclick=()=>{
+  const open=$("classPanel").hidden;$("classPanel").hidden=!open;
+  $("classPanelToggle").setAttribute("aria-expanded",String(open));
+};
+$("pageJump").onchange=()=>{
+  if(!state.pdf)return;
+  const next=Math.max(1,Math.min(state.pdf.numPages,Math.round(Number($("pageJump").value)||1)));
+  $("pageJump").value=next;if(next!==state.page){state.page=next;void renderPage();}
+};
+for(const [id,name] of [["prev","left"],["next","right"],["copy","copy"],["classPanelToggle","users"],["reveal","reveal"],["presentPage","screen"],["openPresentation","screen"],["downloadPDF","download"]])iconButton($(id),name);
+$("uploadIcon").innerHTML=icon("upload");
 $("prev").onclick=()=>{state.page--;void renderPage();};
 $("next").onclick=()=>{state.page++;void renderPage();};
 $("reveal").onclick=async()=>{

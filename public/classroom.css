@@ -48,3 +48,51 @@ body.presenting .native-clip{margin:auto}
 @media(max-width:600px){.board-stage{grid-template-columns:minmax(0,1fr) 76px;gap:5px}.tool-rail{padding:4px}.tool-rail button{font-size:.7rem}}
 .eraser-outline{position:absolute;z-index:2;border:1.5px dotted #172f4b;border-radius:50%;pointer-events:none;box-sizing:border-box;box-shadow:0 0 0 1px #ffffffb3}
 .presentation-frame{border-style:dashed}
+
+/* Full-window teaching desk with persistent navigation and compact chrome. */
+.icon-button{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;width:36px;height:36px;min-width:36px;padding:7px;border-radius:8px}
+.icon-button svg,.pdf-upload svg,.advanced-ink-settings summary svg{width:21px;height:21px;display:block}
+body.workspace-active{height:100dvh;overflow:hidden;background:#e5eaf0}
+body.workspace-active>header{height:40px;min-height:40px;padding:0 16px;background:#202934;font-size:12px}
+body.workspace-active a.brand{font-size:14px}
+body.workspace-active>main{max-width:none;width:100%;height:calc(100dvh - 40px);padding:0;display:flex;flex-direction:column}
+#teacher:not([hidden]){display:flex;flex-direction:column;flex:1;min-height:0}
+.teacher-topbar{display:flex;gap:12px;align-items:center;padding:7px 14px;background:#fff;border-bottom:1px solid #d1dae4;flex-shrink:0}
+.lesson-heading{display:flex;align-items:baseline;gap:12px;min-width:0;flex:1}.lesson-heading h1{font-size:16px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.lesson-heading .eyebrow{font-size:10px;margin:0;white-space:nowrap}
+.class-code{display:flex;gap:9px;align-items:center;font-size:12px;white-space:nowrap}.class-code code{font-size:19px;font-weight:750;letter-spacing:2px;color:#176858}
+#end{font-size:12px;background:#fff5f4;color:#8e3630;border-color:#ead0cd;padding:8px}
+#teacher .teacher-layout{display:flex;flex:1;gap:0;min-height:0;position:relative}
+#teacher .preview{display:flex;flex-direction:column;flex:1;min-width:0;min-height:0;border:0;border-radius:0;padding:0;background:#e5eaf0}
+#teacher .view-tabs{padding:5px 12px;margin:0;background:#f8fafc;gap:5px;flex-shrink:0;border:0}
+.view-tabs button{padding:5px 12px;font-size:12px}
+#teacherSlidePanel:not([hidden]){display:flex;flex-direction:column;min-height:0;flex:1}
+.pdf-navigation{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 12px;background:white;border-block:1px solid #d5dfe8;flex-shrink:0}
+.pdf-upload{position:relative;display:inline-flex;align-items:center;gap:7px;cursor:pointer;font-size:12px;white-space:nowrap;border-radius:7px;padding:6px;background:#f0f5fa}
+.pdf-upload input{position:absolute;inset:0;opacity:0;width:100%;cursor:pointer}
+.pdf-upload:focus-within{outline:2px solid #3183cb}
+.page-navigation,.pdf-share-actions{display:flex;align-items:center;gap:5px}.page-navigation output{font-size:12px;white-space:nowrap;min-width:95px;text-align:center}
+.page-jump-label{font-size:11px;display:flex;align-items:center;gap:5px;white-space:nowrap}#pageJump{width:55px;padding:5px}
+.pdf-share-actions{border-left:1px solid #d5dfe8;padding-left:12px}
+#teacherBoard,#studentBoard{display:flex;flex-direction:column;min-height:0;position:relative;flex:1}
+#teacherBoard .board-tools,#studentBoard .board-tools{padding:6px 12px;gap:5px;background:#f8fafc;flex-shrink:0;border-bottom:1px solid #d5dfe8;font-size:12px}
+.board-tools label{display:inline-flex;gap:5px;align-items:center}.board-tools .actions{gap:8px}.board-tools input[type=number]{padding:5px;width:61px}.ink-swatches{gap:6px}
+.advanced-ink-settings{position:relative;margin-left:auto}.advanced-ink-settings summary{list-style:none;cursor:pointer;padding:5px;border:1px solid #b9c9d7;border-radius:7px}.advanced-ink-settings summary::-webkit-details-marker{display:none}
+.advanced-ink-content{position:absolute;right:0;top:38px;z-index:15;display:grid;gap:12px;min-width:255px;background:white;box-shadow:0 8px 25px #14294133;border:1px solid #c5d2df;border-radius:10px;padding:15px}
+.advanced-ink-content label{display:flex;justify-content:space-between;gap:10px}
+#teacherBoard .board-stage,#studentBoard .board-stage{grid-template-columns:minmax(0,1fr) 52px;gap:0;flex:1;min-height:0}
+#teacherBoard .native-viewport,#studentBoard .native-viewport{height:100%!important;min-height:0;border:0;border-radius:0;background:#dce3eb}
+.tool-rail{background:#25303d;border:0;border-radius:0;padding:6px;gap:6px;position:static;max-height:100%;height:100%;overflow-y:auto;align-items:center;flex-wrap:nowrap}
+.tool-rail .icon-button{color:#d5dfeb;background:transparent;border:1px solid transparent;width:38px;min-width:38px;height:38px;padding:8px}
+.tool-rail .icon-button[aria-pressed=true]{background:#176858;color:#fff;border-color:#5cbb9f}.tool-rail .icon-button:hover{background:#405063}.tool-rail .icon-button:focus-visible{outline-offset:-2px}
+.board-footer{padding:5px 12px;background:#202934;gap:7px;flex-shrink:0;color:#d9e5ee;font-size:11px;min-height:44px}.board-footer .icon-button{background:transparent;color:#e2eaf2;border-color:#4b5a6c;width:31px;height:31px;min-width:31px;padding:6px}.board-footer output{min-width:46px}.board-footer label{display:flex;align-items:center;gap:4px}
+#teacherBoard .board-status,#studentBoard .board-status{font-size:10px;margin:0;padding:3px 12px;background:#f0f4f8;min-height:20px}
+#teacherBoard .board-timer,#studentBoard .board-timer{position:absolute;z-index:12;top:50px;right:65px;max-width:calc(100% - 75px);box-shadow:0 6px 22px #14294133}
+#teacherBoard .input-check,#studentBoard .input-check{position:absolute;z-index:14;bottom:68px;right:64px;max-width:min(480px,calc(100% - 80px));margin:0;font-size:11px;background:#ffffffed;box-shadow:0 3px 12px #14294120}.input-check:not([open]){opacity:.7;padding:4px 7px}
+#classPanel{width:300px;flex:0 0 300px;overflow-y:auto;padding:12px;background:#f1f5f9;border-left:1px solid #c9d6e3;gap:12px;display:flex;flex-direction:column}#classPanel .panel{padding:12px;border-radius:9px}#classPanel h2{font-size:14px}#classPanel p{font-size:12px}#classPanel input{width:100%;font-size:11px;margin-bottom:10px}#classPanel button{font-size:12px}
+#teacherGraphPanel{overflow:auto;padding:14px}#teacherGraphPanel .graph-layout{grid-template-columns:260px minmax(0,1fr)}
+body.workspace-active #notice:not(:empty){position:fixed;left:16px;bottom:12px;z-index:30;max-width:calc(100vw - 32px);background:#fff4ed;border:1px solid #dcbba4;box-shadow:0 4px 16px #14294122;padding:10px 14px;border-radius:9px;margin:0}
+#student:not([hidden]){display:flex;flex-direction:column;flex:1;min-height:0}#student>.heading{margin:0;padding:8px 14px;background:white;flex-shrink:0}#student>.heading h1{font-size:17px}#student>.heading .eyebrow{display:none}
+#student .student-layout{flex:1;min-height:0;grid-template-columns:165px minmax(0,1fr);gap:0}#student .student-layout>aside{overflow:auto;border-radius:0;border:0;padding:12px}#student .work{display:flex;flex-direction:column;min-height:0;padding:0;border:0;border-radius:0}#student .heading.compact{padding:7px 12px;margin:0}#workStatus{font-size:10px;padding:0 12px}#student .view-tabs{margin:0;padding:5px 12px;flex-shrink:0}#studentSlidePanel:not([hidden]){display:flex;flex-direction:column;flex:1;min-height:0}#studentGraphPanel{overflow:auto;padding:12px}
+@media(max-width:850px){.lesson-heading .eyebrow{display:none}.teacher-topbar{gap:7px}.pdf-navigation{gap:5px;padding:5px}.pdf-share-actions{padding-left:5px}.page-jump-label{display:none}#classPanel{position:absolute;right:0;top:0;bottom:0;z-index:20;box-shadow:-10px 0 30px #14294133}#teacherGraphPanel .graph-layout{grid-template-columns:1fr}}
+@media(max-width:600px){.lesson-heading h1{max-width:120px}.teacher-topbar{padding:6px}.class-code{gap:4px}.class-code code{font-size:15px;letter-spacing:1px}.pdf-upload>span:last-of-type{display:none}.page-navigation output{min-width:75px;font-size:10px}.pdf-navigation .icon-button{width:29px;min-width:29px;height:31px;padding:5px}.pdf-share-actions{gap:3px}.board-tools .ink-swatches{display:none}.board-footer{padding:4px;gap:4px}.board-footer .icon-button{width:27px;min-width:27px}#student .student-layout{grid-template-columns:100px minmax(0,1fr)}#student .student-layout>aside{padding:5px;font-size:11px}#teacherBoard .board-stage,#studentBoard .board-stage{grid-template-columns:minmax(0,1fr) 46px}}
+#teacherBoard .advanced-ink-content .input-check,#studentBoard .advanced-ink-content .input-check{position:static;max-width:none;width:100%;box-shadow:none;opacity:1;font-size:11px}

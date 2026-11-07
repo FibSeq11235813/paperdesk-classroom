@@ -1,3 +1,4 @@
+import {icon,iconButton} from "./ui-icons.mjs";
 import {eraseSweep} from "./partial-erase.mjs";
 import {paintMark,saveAnnotation,polar,direction,distance,clamp} from "./marks.mjs";
 import {contactPoint,appendContact,finishContact} from "./tablet-input.mjs";
@@ -51,6 +52,15 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
   const boardStage=document.createElement("div");boardStage.className="board-stage";
   const surface=find(".native-viewport");surface.before(boardStage);boardStage.append(surface,find(".tool-rail"));
   if(readOnly)find(".tool-rail").hidden=true;
+  for(const button of root.querySelectorAll("[data-ink-tool]"))iconButton(button,button.dataset.inkTool);
+  for(const [selector,name] of [[".ink-undo","undo"],[".ink-redo","redo"],[".board-out","minus"],[".board-in","plus"],[".board-fit","fit"],[".board-width","width"],[".board-timer-toggle","timer"],[".frame-toggle","frame"],[".frame-standard","zoom"],[".frame-reset","screen"]])iconButton(find(selector),name);
+  const settingsRow=find(".board-tools > .actions"),advanced=document.createElement("details");
+  advanced.className="advanced-ink-settings";
+  advanced.innerHTML=`<summary title="Input and ink settings" aria-label="Input and ink settings">${icon("settings")}</summary><div class="advanced-ink-content"></div>`;
+  for(const element of [...settingsRow.children])if(element.querySelector?.(".input-mode,.ink-stabilize,.ink-snap,.ink-pressure,.ink-opacity"))advanced.lastElementChild.append(element);
+  settingsRow.append(advanced);
+  const footer=find(".board-tools").children[1];footer.classList.add("board-footer");footer.hidden=readOnly;
+  boardStage.after(footer);
   const clipElement=find(".native-clip"),frameElement=find(".presentation-frame");
   const viewport=find(".native-viewport"),pageElement=find(".native-page"),pdfCanvas=find(".pdf-tile"),inkCanvas=find(".ink-tile"),ink=inkCanvas.getContext("2d");
   let page=null,source=null,logicalHeight=700,originalHeight=700,marks=[],undo=[],redo=[],draft=null,gesture=null,guide=null;
@@ -394,7 +404,10 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     status(inputMode==="mouse"?"Bamboo / legacy mouse input · fixed pen width.":"Standard pen / touch input.");
   };
   configureInput();
-  if(!readOnly)inputCheck=attachInputCheck(root,inkCanvas,()=>inputMode,()=>stabilization.checked);
+  if(!readOnly){
+    inputCheck=attachInputCheck(root,inkCanvas,()=>inputMode,()=>stabilization.checked);
+    advanced.lastElementChild.append(find(".input-check"));
+  }
   find(".ink-undo").onclick=()=>{cancel();if(undo.length){redo.push(marks);marks=undo.pop();changed();redraw();}};
   find(".ink-redo").onclick=()=>{cancel();if(redo.length){undo.push(marks);marks=redo.pop();changed();redraw();}};
   find(".guide-circle").onclick=()=>{if(guide)edit([...marks,{...baseMark("arc",[guide]),radius:radius(),start:0,sweep:Math.PI*2}]);};
