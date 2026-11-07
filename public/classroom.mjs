@@ -1,3 +1,4 @@
+import {frameForPage} from "./presentation-frame.mjs";
 import {createGraph} from "./graph.mjs";
 import {createWhiteboard,loadPDF,bytesToBase64} from "./whiteboard.mjs";
 const $=id=>document.getElementById(id);
@@ -123,6 +124,8 @@ let presentationWindow;
 const teacherBoard=createWhiteboard($("teacherBoard"),{teacher:true,onChange:(marks)=>{
   if(currentTeacherKey)store.set(currentTeacherKey,{version:3,marks,crop:teacherBoard.getCrop()});
   if(currentTeacherKey===presentedKey)scheduleInkPresentation();
+},onCropChange:(crop,height)=>{
+  if(fileKey)store.set("paperdesk.teacher.frame."+fileKey,{crop,height});
 },onPreview:()=>{if(currentTeacherKey===presentedKey)scheduleInkPresentation();}});
 const studentBoard=createWhiteboard($("studentBoard"),{onChange:(marks,view)=>{
   if(state.current===null)return;
@@ -194,7 +197,12 @@ async function renderPage(){
     if(version!==state.render)return;
     currentTeacherKey="paperdesk.teacher."+fileKey+"."+state.page;
     const saved=store.get(currentTeacherKey,{marks:[]});
-    await teacherBoard.setSource({page,bytes:pdfBytes,pageNumber:state.page},saved.marks||[],{crop:saved.crop});
+    const viewport=page.getViewport({scale:1}),height=viewport.height/viewport.width*1000;
+    const frameKey="paperdesk.teacher.frame."+fileKey;
+    let pdfFrame=store.get(frameKey);
+    // Adopt an older page-specific frame once, then use the shared PDF setting.
+    if(pdfFrame===null&&saved.crop){pdfFrame={crop:saved.crop,height};store.set(frameKey,pdfFrame);}
+    await teacherBoard.setSource({page,bytes:pdfBytes,pageNumber:state.page},saved.marks||[],{crop:frameForPage(pdfFrame,height)});
     if(version!==state.render)return;
     $("sourcePage").textContent="Page "+state.page+" / "+state.pdf.numPages;
     $("prev").disabled=state.page<=1;$("next").disabled=state.page>=state.pdf.numPages;

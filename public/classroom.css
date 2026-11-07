@@ -46,3 +46,5 @@ body.presenting .native-clip{margin:auto}
 .tool-rail button{width:100%;font-size:.8rem;padding:8px 4px;min-height:36px}
 .zoom-selection{position:absolute;z-index:5;border:2px solid #176cc7;background:#176cc71f;pointer-events:none;box-sizing:border-box}
 @media(max-width:600px){.board-stage{grid-template-columns:minmax(0,1fr) 76px;gap:5px}.tool-rail{padding:4px}.tool-rail button{font-size:.7rem}}
+.eraser-outline{position:absolute;z-index:2;border:1.5px dotted #172f4b;border-radius:50%;pointer-events:none;box-sizing:border-box;box-shadow:0 0 0 1px #ffffffb3}
+.presentation-frame{border-style:dashed}

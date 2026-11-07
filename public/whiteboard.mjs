@@ -18,7 +18,7 @@ export function bytesToBase64(bytes){
   for(let offset=0;offset<bytes.length;offset+=32768)value+=String.fromCharCode(...bytes.subarray(offset,offset+32768));
   return btoa(value);
 }
-export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},readOnly=false,teacher=false}={}){
+export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropChange=()=>{},readOnly=false,teacher=false}={}){
   root.innerHTML=`
     <div class="board-tools" ${readOnly?"hidden":""}>
       <div class="actions tool-rail" role="toolbar" aria-label="Drawing tools">
@@ -45,7 +45,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},readOnly
     <div class="board-timer actions" hidden><strong class="timer-readout">05:00</strong><select class="timer-mode" aria-label="Timer mode"><option>Countdown</option><option>Stopwatch</option></select><label class="timer-minutes-label">Minutes <input class="timer-minutes" type="number" min=".1" max="180" value="5"></label><button class="timer-start">Start</button><button class="timer-reset">Reset</button></div>
     <div class="native-viewport" tabindex="0" aria-label="Zoomable PDF workspace"><div class="native-clip"><div class="native-page">
       <canvas class="pdf-tile"></canvas><canvas class="ink-tile" aria-label="Draw on the PDF"></canvas>
-      <div class="zoom-selection" hidden></div><div class="presentation-frame" tabindex="0" role="group" aria-label="Clean-screen frame. Drag to move or use arrow keys." hidden><span class="frame-caption">Clean screen</span><button data-corner="nw" aria-label="Resize frame top left"></button><button data-corner="ne" aria-label="Resize frame top right"></button><button data-corner="sw" aria-label="Resize frame bottom left"></button><button data-corner="se" aria-label="Resize frame bottom right"></button></div>
+      <div class="eraser-outline" hidden></div><div class="zoom-selection" hidden></div><div class="presentation-frame" tabindex="0" role="group" aria-label="Clean-screen frame. Drag to move or use arrow keys." hidden><span class="frame-caption">Clean screen</span><button data-corner="nw" aria-label="Resize frame top left"></button><button data-corner="ne" aria-label="Resize frame top right"></button><button data-corner="sw" aria-label="Resize frame bottom left"></button><button data-corner="se" aria-label="Resize frame bottom right"></button></div>
     </div></div></div><p class="board-status" role="status">${readOnly?"":"Use a mouse or stylus to draw. Pen pressure is optional."}</p>`;
   const find=selector=>root.querySelector(selector);
   const boardStage=document.createElement("div");boardStage.className="board-stage";
@@ -56,7 +56,8 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},readOnly
   let page=null,source=null,logicalHeight=700,originalHeight=700,marks=[],undo=[],redo=[],draft=null,gesture=null,guide=null;
   let zoom=1,scale=1,tool="pen",renderTask=null,generation=0,renderTimer,drawFrame,baseWidth=700,sceneVersion=0;
   let tile={x:0,y:0,width:1,height:1,dpr:1},renderedTile=null;
-  let pointerInput,frameInput,inputCheck,crop=null,editingFrame=false,frameDrag=null;
+  let pointerInput,frameInput,inputCheck,crop=null,editingFrame=false,frameDrag=null,eraserAt=null;
+  const cropChanged=()=>onCropChange(clone(crop),originalHeight);
   const clone=value=>JSON.parse(JSON.stringify(value));
   const radius=()=>clamp(Number(find(".guide-radius").value)||100,10,1000);
   const rotation=()=>Number(find(".guide-rotation").value||0)*Math.PI/180;
@@ -74,7 +75,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},readOnly
     find(".rotation-label").hidden=find(".ray-label").hidden=tool!=="protractor";
     find(".guide-circle").hidden=tool!=="compass";
   }
-  const presets={pen:{color:"#174a87",width:.5,opacity:100},highlighter:{color:"#ffdd3e",width:.5,opacity:32},shape:{color:"#174a87",width:.5,opacity:100},eraser:{color:"#174a87",width:.5,opacity:100}};
+  const presets={pen:{color:"#174a87",width:.5,opacity:100},highlighter:{color:"#ffdd3e",width:.5,opacity:32},shape:{color:"#174a87",width:.5,opacity:100},eraser:{color:"#174a87",width:25,opacity:100}};
   for(const name of ["line","rect","ellipse","compass","protractor","pan","zoom"])presets[name]={...presets.shape};
   const presetKey=value=>value;
   function choose(next){
@@ -86,7 +87,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},readOnly
     if(oldKey!==nextKey){
       const preset=presets[nextKey];find(".ink-color").value=preset.color;find(".ink-width").value=preset.width;find(".ink-opacity").value=preset.opacity;
     }
-    geometry();redraw();
+    geometry();positionEraser();redraw();
   }
   for(const button of root.querySelectorAll("[data-ink-tool]"))button.onclick=()=>choose(button.dataset.inkTool);
   for(const color of ["#174a87","#161c25","#c52d42","#11714b","#8042ac","#ffdd3e","#f47c24","#ffffff"]){
@@ -168,7 +169,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},readOnly
     clipElement.style.width=region.width*scale+"px";clipElement.style.height=region.height*scale+"px";
     pageElement.style.width=1000*scale+"px";pageElement.style.height=visibleHeight()*scale+"px";
     pageElement.style.left=-region.x*scale+"px";pageElement.style.top=-region.y*scale+"px";
-    positionFrame();
+    positionFrame();positionEraser();
     find(".board-zoom").textContent=Math.round(zoom*100)+"%";
     if(anchor){
       viewport.scrollLeft=(viewport.scrollLeft+anchor.x-16)*scale/oldScale-anchor.x+16;
@@ -194,9 +195,9 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},readOnly
     if(!source){status("Open a page first.");return;}
     cancel();editingFrame=!editingFrame;
     if(editingFrame&&!crop)crop={x:100,y:originalHeight*.15,width:800,height:originalHeight*.7};
-    positionFrame();changed();status(editingFrame?"Move the frame by dragging inside it. Drag a corner to resize. Only the framed area appears on the clean screen.":"Frame hidden. The clean screen keeps the selected area.");
+    positionFrame();positionEraser();cropChanged();changed();status(editingFrame?"Move the frame by dragging inside it. Drag a corner to resize. Only the framed area appears on the clean screen.":"Frame hidden. The clean screen keeps the selected area.");
   };
-  find(".frame-reset").onclick=()=>{crop=null;editingFrame=false;positionFrame();changed();status("The clean screen now shows the full page.");};
+  find(".frame-reset").onclick=()=>{crop=null;editingFrame=false;positionFrame();positionEraser();cropChanged();changed();status("The clean screen now shows the full page.");};
   const frameCallbacks={
     start:event=>{
       if(!crop||!editingFrame)return false;
@@ -209,14 +210,14 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},readOnly
       crop=adjustFrame(frameDrag.original,frameDrag.action,(event.clientX-frameDrag.start.x)/frameDrag.scale,(event.clientY-frameDrag.start.y)/frameDrag.scale,originalHeight);
       positionFrame();onPreview();
     },
-    end:()=>{frameDrag=null;changed();},
-    cancel:()=>{frameDrag=null;changed();}
+    end:()=>{frameDrag=null;cropChanged();changed();},
+    cancel:()=>{frameDrag=null;cropChanged();changed();}
   };
   frameElement.onkeydown=event=>{
     if(!crop||!["ArrowLeft","ArrowRight","ArrowUp","ArrowDown"].includes(event.key))return;
     event.preventDefault();
     const step=event.shiftKey?10:1,dx=event.key==="ArrowLeft"?-step:event.key==="ArrowRight"?step:0,dy=event.key==="ArrowUp"?-step:event.key==="ArrowDown"?step:0;
-    crop=adjustFrame(crop,event.target.dataset.corner||"move",dx,dy,originalHeight);positionFrame();changed();
+    crop=adjustFrame(crop,event.target.dataset.corner||"move",dx,dy,originalHeight);positionFrame();cropChanged();changed();
   };
   function guidePaint(context){
     if(!guide||!["compass","protractor"].includes(tool))return;
@@ -255,10 +256,27 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},readOnly
     find(".zoom-selection").hidden=true;gesture=null;draft=null;pointerInput?.reset();
     redraw();if(hadDraft)onPreview();
   }
+  function positionEraser(){
+    const outline=find(".eraser-outline");
+    outline.hidden=readOnly||tool!=="eraser"||!eraserAt||editingFrame;
+    if(outline.hidden)return;
+    const diameter=clamp(Number(find(".ink-width").value)||25,.1,60)*scale;
+    outline.style.width=diameter+"px";outline.style.height=diameter+"px";
+    outline.style.left=(eraserAt.x*scale-diameter/2)+"px";outline.style.top=(eraserAt.y*scale-diameter/2)+"px";
+  }
+  function trackEraser(event){
+    if(readOnly||tool!=="eraser")return;
+    eraserAt=point(event);positionEraser();
+  }
+  // Hover display is independent of the established tablet drawing lifecycle.
+  window.addEventListener("mousemove",event=>{if(inputMode==="mouse")trackEraser(event);},true);
+  window.addEventListener("pointermove",event=>{if(inputMode!=="mouse")trackEraser(event);},true);
+  window.addEventListener("blur",()=>{eraserAt=null;positionEraser();});
+  find(".ink-width").addEventListener("input",positionEraser);
   function erase(at){
     const active=gesture;
     const next=eraseSweep(marks,active.lastErase||at,at,Math.max(.05,Number(find(".ink-width").value)/2));
-    active.lastErase=at;
+    active.lastErase=at;eraserAt=at;positionEraser();
     if(next!==marks){if(!active.eraseOriginal)active.eraseOriginal=marks;marks=next;redraw();onPreview();}
   }
   function showZoomBox(a,b){
@@ -398,7 +416,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},readOnly
   setInterval(clock,200);
   async function setSource(next,initial=[],view={}){
     const current=++sceneVersion;generation++;renderTask?.cancel();cancel();
-    source=next;page=next.page||null;guide=null;undo=[];redo=[];renderedTile=null;
+    source=next;page=next.page||null;guide=null;eraserAt=null;positionEraser();undo=[];redo=[];renderedTile=null;
     originalHeight=page?page.getViewport({scale:1}).height/page.getViewport({scale:1}).width*1000:next.image.naturalHeight/next.image.naturalWidth*1000;
     logicalHeight=originalHeight+Math.max(220,430);
     crop=normalizeFrame(view.crop,originalHeight);editingFrame=false;positionFrame();

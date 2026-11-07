@@ -16,3 +16,10 @@ export function adjustFrame(frame,action,dx,dy,height){
   if(action.includes("s"))bottom=clamp(bottom+dy,top+Math.min(40,height),height);
   return normalizeFrame({x:left,y:top,width:right-left,height:bottom-top},height);
 }
+
+// Carry one PDF-wide frame across pages, including pages with different heights.
+export function frameForPage(saved,height){
+  if(!saved?.crop)return null;
+  const ratio=Number.isFinite(saved.height)&&saved.height>0?height/saved.height:1;
+  return normalizeFrame({...saved.crop,y:saved.crop.y*ratio,height:saved.crop.height*ratio},height);
+}
