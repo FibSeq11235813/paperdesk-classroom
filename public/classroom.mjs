@@ -255,7 +255,7 @@ $("downloadPDF").onclick=async()=>{
 $("join").onsubmit=async event=>{
   event.preventDefault();
   const code=cleanCode($("code").value);
-  if(!/^[a-f0-9]{12}$/.test(code)){notice("Enter the 12-character class code.");return;}
+  if(!/^(?:[a-z0-9]{4}|[a-f0-9]{12})$/.test(code)){notice("Enter the 4-character class code.");return;}
   const submit=event.submitter;
   submit.disabled=true;
   try {await join(code,shortName($("name").value));}
