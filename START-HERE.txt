@@ -1,0 +1,145 @@
+Paperdesk Classroom | Version 0.2
+
+Online test edition
+https://paperdesk-classroom-tyler.adoredcoach1.chatgpt.site/
+
+Sign in with ChatGPT to start a class. Students can join with a class link
+and display name. The planned custom address is classroom.mathbytyler.com;
+it will work after the domain's DNS verification and routing records are set.
+
+Teaching
+Open your PDF or the included example deck. Only pages you explicitly
+reveal are uploaded. Preview later pages privately.
+Use Graph to prepare a graph activity and Reveal graph to give each student
+an editable copy. Student changes do not change the teacher's graph.
+
+Graph desk
+Plot up to 12 functions of x. Use ^ for powers. Trig uses radians.
+Examples: y=x^2, y=2x+1, sin(x), sqrt(x), 1/x, and a*x^2+b.
+Single-letter parameters generate sliders. Drag to pan and scroll or pinch
+to zoom. Reset axes restores the default view. This edition plots y=f(x);
+implicit equations, inequalities, and symbolic algebra are not implemented.
+
+Student workspace
+Each revealed page has a Slide & ink tab and a Graph tab. Write directly on
+the uploaded page. Extra scratch space starts off on new pages; enable it
+when needed. Fit page, Fit width, +, -, Pan, and Ctrl+scroll control the view.
+Ink is stored in page coordinates and scales with the page. Touch pans;
+a mouse or stylus draws. Existing work from version 0.1 is retained.
+Share with teacher sends a snapshot of the active tab.
+
+Student ink and graph edits save per slide in the current browser. They
+survive refresh in the same browser and origin; private browsing storage
+can be cleared when private windows close. They do not sync to another
+device. Switching between the temporary domain and custom domain uses
+separate browser storage. Keep one address throughout a lesson.
+The teacher's resume key is also saved in the browser that created the class.
+End class removes its revealed pages and shared work from the active service.
+
+Local Windows test
+Install Node.js 24 or newer, extract this folder, and run Start-Classroom.cmd.
+Keep the window open and visit http://127.0.0.1:4170/ in Edge or Chrome.
+Use the student link in a private browser window to play both roles.
+Mac/Linux: run node server.mjs from this folder.
+The optional TEACHER_PASSWORD environment variable protects room creation
+on a self-hosted Node server. Use HTTPS and persistent PAPERDESK_DATA
+storage when self-hosting remotely.
+
+Hosting and source
+The hosted adapter uses Sites for HTTPS and teacher sign-in, D1 for class
+records, and R2 for revealed page images and shared snapshots. The test
+edition polls for newly revealed pages about every 2 seconds.
+Source files are under public/. server.mjs is the local Node server.
+worker/index.mjs and scripts/build-hosted.mjs produce the cloud Worker.
+The .openai manifest declares DB and BUCKET. drizzle contains migrations.
+Run npm test for parser and hosted-access regression checks.
+
+Version 0.3 — teacher workspace and native PDF pages
+The teacher now has the full drawing toolbar: pens, highlighters, eraser,
+solid/dashed/dotted lines, rectangles, ellipses, a protractor, a compass,
+undo/redo, and a countdown/stopwatch. Use Snap for squares, circles, and
+45-degree line angles. Ink widths and colors are remembered by tool while
+the workspace stays open.
+
+Open clean screen creates a separate window in the same browser. Move it
+to your second monitor and share that window/screen in your meeting app.
+Double-click its page to enter full screen. The teacher's tools and geometry
+guides stay on the teacher window. Present this page selects which page
+the clean screen shows. Annotations on that presented page update live.
+Navigating to a different page privately does not switch the clean screen.
+Present graph on clean screen does the same for the graph workspace.
+
+Native PDF source is retained locally. Revealing a PDF page now extracts
+only that page, with its fonts, vector graphics, original boxes, rotation,
+and teacher annotations. Student and presentation viewers redraw the
+visible area directly from that PDF at each zoom. Scanned images retain
+their original image quality. Zoom does not create detail missing from
+a scan. Each revealed native PDF page has an 8 MB upload limit.
+
+Older revealed slides were saved as images. To get native quality, open
+the original PDF and reveal those pages again. They cannot be reconstructed
+as vector PDFs from the earlier image copies.
+
+Download annotated page saves the current teacher page as a PDF, including
+vector annotations. Student sharing continues to send a snapshot of the
+current workspace. Additional student scratch space stays optional.
+
+Tablet handling now uses only contact moves. It ignores pen hover and
+lift-packet coordinates, uses the main pointer packet rather than merged
+driver samples, and separates sudden coordinate jumps. Pen pressure is
+optional and starts off. Hardware-specific behavior still needs to be
+checked with the actual drawing tablet.
+
+Version 0.4 — width, tablet recovery, and presentation framing
+New pen strokes start at width 1. Existing annotations keep their widths.
+
+Adjust clean-screen frame shows a blue rectangle on the teacher page.
+Drag its interior to move it and drag a corner to resize. The clean window
+fills its available space with that area while retaining the PDF aspect ratio.
+Turn the adjustment button off to hide the frame and write through it.
+Full page on clean screen removes the crop. Each page remembers its own
+frame in this browser. The frame is private to the teacher and is not ink.
+When editing a privately previewed page, use Present this page to send it
+and its selected frame to the clean window.
+
+Pen contact is now tracked from press to release without requiring the
+mouse-button flag on each movement. A window-level listener handles moves
+and releases if a tablet rejects pointer capture. A fresh contact recovers
+from a previous missing release, including when switching back to the mouse.
+The regression checks cover these driver behaviors. The physical tablet
+still needs an on-device test.
+
+Version 0.5 — Bamboo compatibility mode and event reporting
+Drawing input mode now offers Bamboo / legacy mouse. It uses browser mouse
+events and bypasses pointer capture and pen/touch packet classification.
+Pen pressure is unavailable in that mode. Windows Firefox selects it by
+default unless a different mode has been saved in this browser. Other
+browsers keep Standard pen / touch by default. The selected mode is saved.
+
+If drawing still fails, expand Tablet input check below the page. Start
+the 15-second check, try a few strokes, and choose Copy input report.
+Paste that report into our chat. It includes browser information and a
+bounded recent sequence of input events. It contains no PDF contents or
+room credentials and is not uploaded automatically. The recorder includes
+input events across the browser window during that short check so missing
+or retargeted tablet events can be identified.
+
+Version 0.6 — Stroke stabilization and paced drawing updates
+Bamboo / legacy mouse mode now defaults to Stabilize strokes. The adaptive
+filter smooths small coordinate wobble, limits trailing distance at every
+zoom, and preserves deliberate direction changes. Toggle it off to compare.
+This applies to new pen and highlighter strokes; existing ink is unchanged.
+Backdated movement packets are ignored. Canvas redraws and clean-screen
+updates are paced so continuous movement does not postpone queued updates.
+
+The input check now retains contact transitions and raw/drawn stroke points
+rather than losing the stroke to later hover samples. If jitter persists,
+record several short strokes and copy the report for diagnosis. The physical
+Bamboo tablet still needs an on-device test.
+
+Version 0.7 — right toolbar, fine widths, box zoom, partial eraser
+See HOSTING.md for the standalone GitHub/Render setup and usage notes.
+The working Bamboo stroke filter and input lifecycle are retained. All
+new drawing tools default to 0.5 width with 0.1 increments. Hold Alt and
+drag a rectangle to zoom, or select Zoom box. The eraser trims parts of
+annotations, with a whole eraser drag grouped into one undo step.

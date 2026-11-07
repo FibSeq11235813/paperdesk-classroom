@@ -1,0 +1,14 @@
+{
+  "name": "paperdesk-classroom",
+  "private": true,
+  "version": "0.7.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node server.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "build": "node scripts/build-hosted.mjs"
+  }
+}

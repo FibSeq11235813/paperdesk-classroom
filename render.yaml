@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: paperdesk-classroom
+    runtime: node
+    plan: starter
+    buildCommand: npm install --omit=dev
+    startCommand: node server.mjs --host 0.0.0.0
+    healthCheckPath: /api/config
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      - key: PAPERDESK_DATA
+        value: /var/data
+      - key: TEACHER_PASSWORD
+        generateValue: true
+    disk:
+      name: paperdesk-data
+      mountPath: /var/data
+      sizeGB: 1
