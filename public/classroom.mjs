@@ -1,4 +1,4 @@
-import {frameForPage} from "./presentation-frame.mjs";
+import {frameForPage,standardSlideFrame} from "./presentation-frame.mjs";
 import {createGraph} from "./graph.mjs";
 import {createWhiteboard,loadPDF,bytesToBase64} from "./whiteboard.mjs";
 const $=id=>document.getElementById(id);
@@ -202,7 +202,9 @@ async function renderPage(){
     let pdfFrame=store.get(frameKey);
     // Adopt an older page-specific frame once, then use the shared PDF setting.
     if(pdfFrame===null&&saved.crop){pdfFrame={crop:saved.crop,height};store.set(frameKey,pdfFrame);}
-    await teacherBoard.setSource({page,bytes:pdfBytes,pageNumber:state.page},saved.marks||[],{crop:frameForPage(pdfFrame,height)});
+    const defaultCrop=standardSlideFrame(viewport.width,viewport.height);
+    const crop=pdfFrame===null?defaultCrop:frameForPage(pdfFrame,height);
+    await teacherBoard.setSource({page,bytes:pdfBytes,pageNumber:state.page},saved.marks||[],{crop,defaultCrop});
     if(version!==state.render)return;
     $("sourcePage").textContent="Page "+state.page+" / "+state.pdf.numPages;
     $("prev").disabled=state.page<=1;$("next").disabled=state.page>=state.pdf.numPages;

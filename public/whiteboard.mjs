@@ -38,7 +38,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
         <button class="board-fit">Fit page</button><button class="board-width">Fit width</button>
         <label ${teacher?"hidden":""}><input class="board-scratch" type="checkbox">Extra scratch space</label>
         <button class="board-timer-toggle">Timer</button>
-        <button class="frame-toggle" aria-pressed="false" ${teacher?"":"hidden"}>Adjust clean-screen frame</button><button class="frame-reset" ${teacher?"":"hidden"}>Full page on clean screen</button>
+        <button class="frame-toggle" aria-pressed="false" ${teacher?"":"hidden"}>Adjust clean-screen frame</button><button class="frame-standard" hidden>Standard slide view</button><button class="frame-reset" ${teacher?"":"hidden"}>Full page on clean screen</button>
       </div>
       <div class="geometry-tools actions" hidden><span class="geometry-help"></span><label>Radius <input class="guide-radius" type="number" min="10" max="1000" value="100"></label><label class="rotation-label">Rotation ° <input class="guide-rotation" type="number" value="0"></label><label class="ray-label"><input class="guide-ray" type="checkbox">Draw ray</label><button class="guide-circle">Draw full circle</button><output class="guide-angle"></output></div>
     </div>
@@ -56,7 +56,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
   let page=null,source=null,logicalHeight=700,originalHeight=700,marks=[],undo=[],redo=[],draft=null,gesture=null,guide=null;
   let zoom=1,scale=1,tool="pen",renderTask=null,generation=0,renderTimer,drawFrame,baseWidth=700,sceneVersion=0;
   let tile={x:0,y:0,width:1,height:1,dpr:1},renderedTile=null;
-  let pointerInput,frameInput,inputCheck,crop=null,editingFrame=false,frameDrag=null,eraserAt=null;
+  let pointerInput,frameInput,inputCheck,crop=null,editingFrame=false,frameDrag=null,eraserAt=null,standardCrop=null;
   const cropChanged=()=>onCropChange(clone(crop),originalHeight);
   const clone=value=>JSON.parse(JSON.stringify(value));
   const radius=()=>clamp(Number(find(".guide-radius").value)||100,10,1000);
@@ -184,6 +184,18 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     const value=readOnly?Math.min(width/region.width,height/region.height)/(width/1000):(mode==="width"?1:Math.min(1,height/(visibleHeight()*width/1000)));
     layout(value);viewport.scrollTo(0,0);
   }
+  function zoomToRegion(region){
+    const nextScale=Math.min((viewport.clientWidth-32)/region.width,(viewport.clientHeight-32)/region.height);
+    layout(nextScale/(Math.max(80,viewport.clientWidth-32)/1000));
+    viewport.scrollLeft=(region.x+region.width/2)*scale-viewport.clientWidth/2+16;
+    viewport.scrollTop=(region.y+region.height/2)*scale-viewport.clientHeight/2+16;
+    scheduleRender();
+  }
+  find(".frame-standard").onclick=()=>{
+    if(!standardCrop)return;
+    cancel();crop={...standardCrop};editingFrame=false;positionFrame();cropChanged();zoomToRegion(crop);changed();
+    status("Standard slide area selected for this PDF and the clean screen.");
+  };
   function positionFrame(){
     frameElement.hidden=!teacher||!editingFrame||!crop;
     find(".frame-toggle").setAttribute("aria-pressed",String(editingFrame));
@@ -419,7 +431,9 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     source=next;page=next.page||null;guide=null;eraserAt=null;positionEraser();undo=[];redo=[];renderedTile=null;
     originalHeight=page?page.getViewport({scale:1}).height/page.getViewport({scale:1}).width*1000:next.image.naturalHeight/next.image.naturalWidth*1000;
     logicalHeight=originalHeight+Math.max(220,430);
-    crop=normalizeFrame(view.crop,originalHeight);editingFrame=false;positionFrame();
+    crop=normalizeFrame(view.crop,originalHeight);standardCrop=normalizeFrame(view.defaultCrop,originalHeight);
+    find(".frame-standard").hidden=!teacher||!standardCrop;
+    editingFrame=false;positionFrame();
     marks=Array.isArray(initial)?initial.map(mark=>mark.kind?clone(mark):{
       kind:mark.tool||"pen",points:mark.points.map(([x,y])=>({x:x*1000,y:y*logicalHeight,p:.5})),
       color:mark.color,width:mark.width??(mark.tool==="highlighter"?13:3),opacity:mark.tool==="highlighter"?.31:1,pattern:"Solid",variable:false
@@ -428,7 +442,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     viewport.scrollTo(0,0);
     await new Promise(resolve=>requestAnimationFrame(resolve));
     if(current!==sceneVersion)return;
-    if(view.zoom)layout(view.zoom);else fit();
+    if(view.zoom)layout(view.zoom);else if(teacher&&crop)zoomToRegion(crop);else fit();
     changed();status(next.page?"Native PDF · Alt + drag to zoom into a rectangle.":"Image slide · Alt + drag to zoom into a rectangle.");
   }
   async function snapshot(){
