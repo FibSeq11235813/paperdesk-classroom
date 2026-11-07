@@ -56,7 +56,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
   let page=null,source=null,logicalHeight=700,originalHeight=700,marks=[],undo=[],redo=[],draft=null,gesture=null,guide=null;
   let zoom=1,scale=1,tool="pen",renderTask=null,generation=0,renderTimer,drawFrame,baseWidth=700,sceneVersion=0;
   let tile={x:0,y:0,width:1,height:1,dpr:1},renderedTile=null;
-  let pointerInput,frameInput,inputCheck,crop=null,editingFrame=false,frameDrag=null,eraserAt=null,standardCrop=null;
+  let pointerInput,frameInput,inputCheck,crop=null,editingFrame=false,frameDrag=null,eraserAt=null,standardCrop=null,initialRegion=null;
   const cropChanged=()=>onCropChange(clone(crop),originalHeight);
   const clone=value=>JSON.parse(JSON.stringify(value));
   const radius=()=>clamp(Number(find(".guide-radius").value)||100,10,1000);
@@ -431,6 +431,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     source=next;page=next.page||null;guide=null;eraserAt=null;positionEraser();undo=[];redo=[];renderedTile=null;
     originalHeight=page?page.getViewport({scale:1}).height/page.getViewport({scale:1}).width*1000:next.image.naturalHeight/next.image.naturalWidth*1000;
     logicalHeight=originalHeight+Math.max(220,430);
+    initialRegion=normalizeFrame(view.initialRegion,originalHeight);
     crop=normalizeFrame(view.crop,originalHeight);standardCrop=normalizeFrame(view.defaultCrop,originalHeight);
     find(".frame-standard").hidden=!teacher||!standardCrop;
     editingFrame=false;positionFrame();
@@ -442,7 +443,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     viewport.scrollTo(0,0);
     await new Promise(resolve=>requestAnimationFrame(resolve));
     if(current!==sceneVersion)return;
-    if(view.zoom)layout(view.zoom);else if(teacher&&crop)zoomToRegion(crop);else fit();
+    if(view.zoom)layout(view.zoom);else if(teacher&&crop)zoomToRegion(crop);else if(initialRegion)zoomToRegion(initialRegion);else fit();
     changed();status(next.page?"Native PDF · Alt + drag to zoom into a rectangle.":"Image slide · Alt + drag to zoom into a rectangle.");
   }
   async function snapshot(){
@@ -466,7 +467,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     for(const mark of savedMarks)saveAnnotation(output,copy,mark,p=>view.convertToPdfPoint(p.x*view.width/1000,p.y*view.width/1000));
     return output.save({updateFieldAppearances:false});
   }
-  return {setSource,fit,snapshot,nativePDF,getMarks:()=>clone(marks),
+  return {setSource,fit,fitDefaultView:()=>{if(initialRegion)zoomToRegion(initialRegion);else fit();},snapshot,nativePDF,getMarks:()=>clone(marks),
     setMarks:value=>{marks=clone(value);redraw();},
     getCrop:()=>clone(crop),
     setCrop:value=>{const next=normalizeFrame(value,originalHeight);if(JSON.stringify(crop)===JSON.stringify(next))return;crop=next;if(readOnly)fit();else positionFrame();},

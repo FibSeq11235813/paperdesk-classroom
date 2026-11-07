@@ -23,7 +23,7 @@ function setView(role,view){
   $(role+"SlidePanel").hidden=graph;
   $(role+"GraphTab").setAttribute("aria-pressed",String(graph));
   $(role+"SlideTab").setAttribute("aria-pressed",String(!graph));
-  if(role==="student"){studentView=view;if(!graph)requestAnimationFrame(()=>studentBoard.fit());}
+  if(role==="student"){studentView=view;if(!graph)requestAnimationFrame(()=>studentBoard.fitDefaultView());}
 
 }
 for(const role of ["teacher","student"]){
@@ -365,6 +365,11 @@ async function loadSlide(slide){
     studentGraph.restore(store.get(workKey()+".graph",slide.graph));
     $("work").hidden=false;$("workTitle").textContent=slide.label;
     setView("student",slide.graph?"Graph":"Slide");
+    if(source.page){
+      const pageView=source.page.getViewport({scale:1});
+      settings.initialRegion=standardSlideFrame(pageView.width,pageView.height);
+      if(settings.initialRegion)delete settings.zoom;
+    }
     await studentBoard.setSource(source,initial,settings);
     if(version!==state.boardVersion){await nextDoc?.destroy();return;}
     const old=studentDocument;studentDocument=nextDoc;if(old)void old.destroy().catch(()=>{});
