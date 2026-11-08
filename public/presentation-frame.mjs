@@ -27,5 +27,5 @@ export function frameForPage(saved,height){
 // Tyler's 24 × 12 inch template: the small slide panel at the upper left.
 export function standardSlideFrame(width,height){
   if(Math.abs(width-1728)>17.28||Math.abs(height-864)>8.64)return null;
-  return {x:60,y:0,width:300,height:160};
+  return {x:15,y:0,width:390,height:208};
 }

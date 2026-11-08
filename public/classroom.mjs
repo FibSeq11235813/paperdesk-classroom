@@ -316,22 +316,64 @@ async function refresh(){
   } finally{refreshing=false;}
 }
 setInterval(()=>void refresh(),1800);
-let submissionURL;
+let submissionDocument,submissionGeneration=0;
+const submissionBoard=createWhiteboard($("submissionBoard"),{readOnly:true});
 async function viewSubmission(item,slide){
+  const version=++submissionGeneration;
+  let nextDoc;
   try {
-    const blob=await api(roomPath()+"/submissions/"+item.id,{token:state.token,image:true});
-    if(submissionURL)URL.revokeObjectURL(submissionURL);
-    submissionURL=URL.createObjectURL(blob);
-    $("submissionImage").src=submissionURL;
     $("submissionTitle").textContent=item.name+" · "+(slide||"Slide");
+    $("submissionStatus").textContent="Loading shared work…";$("submissionSnip").disabled=true;
     if(!$("viewer").open)$("viewer").showModal();
-  }catch(error){notice(error.message);}
+    let detail;
+    try{detail=await api(roomPath()+"/submissions/"+item.id+"/work",{token:state.token});}catch(error){if(error.status!==404)throw error;}
+    let source,marks=[],view={};
+    if(detail?.work?.type==="slide"){
+      marks=detail.work.marks;view.scratch=!!detail.work.scratch;
+      if(detail.native){
+        const blob=await api(slideURL(detail.slide)+"/pdf",{token:state.token,image:true});
+        const bytes=await blob.arrayBuffer();nextDoc=await loadPDF(bytes);
+        source={bytes,page:await nextDoc.getPage(1),pageNumber:1};
+        const v=source.page.getViewport({scale:1});view.initialRegion=standardSlideFrame(v.width,v.height);
+      }else{
+        const blob=await api(slideURL(detail.slide),{token:state.token,image:true});
+        source={image:await imageFromBlob(blob)};
+      }
+    }else{
+      const blob=await api(roomPath()+"/submissions/"+item.id,{token:state.token,image:true});
+      source={image:await imageFromBlob(blob)};
+    }
+    if(version!==submissionGeneration){await nextDoc?.destroy();return;}
+    await submissionBoard.setSource(source,marks,view);
+    if(version!==submissionGeneration){await nextDoc?.destroy();return;}
+    const old=submissionDocument;submissionDocument=nextDoc;if(old)void old.destroy().catch(()=>{});
+    $("submissionStatus").textContent=source.page?"Native PDF + vector annotations":"Image preview — zoom and snip available";
+    $("submissionSnip").disabled=false;
+  }catch(error){if(version===submissionGeneration)$("submissionStatus").textContent=error.message;}
 }
-$("viewer").onclose=()=>{
-  if(submissionURL)URL.revokeObjectURL(submissionURL);
-  $("submissionImage").removeAttribute("src");
-  submissionURL=null;
+async function imageFromBlob(blob){
+  const url=URL.createObjectURL(blob),image=new Image();
+  try{image.src=url;await image.decode();return image;}finally{URL.revokeObjectURL(url);}
+}
+$("submissionOut").onclick=()=>submissionBoard.zoomBy(1/1.3);
+$("submissionIn").onclick=()=>submissionBoard.zoomBy(1.3);
+$("submissionFit").onclick=()=>submissionBoard.fit();
+$("submissionSnip").onclick=()=>{
+  if(!teacherBoard.getSource()){ $("submissionStatus").textContent="Open a teacher PDF before copying a section.";return;}
+  $("submissionStatus").textContent="Drag a rectangle over the work to copy. Escape cancels.";
+  submissionBoard.selectRegion(async region=>{
+    const version=submissionGeneration;
+    try{
+      $("submissionStatus").textContent="Preparing snippet…";
+      const image=await submissionBoard.snapshotRegion(region);
+      if(version!==submissionGeneration)return;
+      await teacherBoard.placeSnippet(image,region.width/region.height);
+      $("viewer").close();
+      $("connection").textContent="Click or drag on the teacher page to place the snippet.";
+    }catch(error){$("submissionStatus").textContent=error.message;}
+  });
 };
+$("viewer").onclose=()=>{submissionGeneration++;submissionBoard.cancelSelection();};
 
 async function updateStudent(slides) {
   const changed=slides.length!==state.slides.length;
@@ -402,7 +444,8 @@ $("share").onclick=async()=>{
   const version=state.boardVersion,slide=state.current;
   try{
     const copy=studentView==="Graph"?studentGraph.snapshot():await studentBoard.snapshot();
-    await api(roomPath()+"/submissions",{method:"POST",body:{slide,name:state.name,image:copy.toDataURL("image/jpeg",.8)}});
+    await api(roomPath()+"/submissions",{method:"POST",body:{slide,name:state.name,image:copy.toDataURL("image/jpeg",.8),
+      ...(studentView==="Graph"?{}:{work:{version:1,type:"slide",marks:studentBoard.getMarks(),scratch:studentBoard.getScratch()}})}});
     if(version===state.boardVersion)workStatus("This page was shared with your teacher.");
   }catch(error){if(version===state.boardVersion)workStatus(error.message);}
   finally{$("share").disabled=!state.room;}

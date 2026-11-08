@@ -1,6 +1,6 @@
 import {icon,iconButton} from "./ui-icons.mjs";
 import {eraseSweep} from "./partial-erase.mjs";
-import {paintMark,saveAnnotation,polar,direction,distance,clamp} from "./marks.mjs";
+import {paintMark,saveAnnotation,loadMarkImages,polar,direction,distance,clamp} from "./marks.mjs";
 import {contactPoint,appendContact,finishContact} from "./tablet-input.mjs";
 import {bindPointerInput,defaultInputMode} from "./pointer-input.mjs";
 import {attachInputCheck} from "./input-check.mjs";
@@ -66,7 +66,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
   let page=null,source=null,logicalHeight=700,originalHeight=700,marks=[],undo=[],redo=[],draft=null,gesture=null,guide=null;
   let zoom=1,scale=1,tool="pen",renderTask=null,generation=0,renderTimer,drawFrame,baseWidth=700,sceneVersion=0;
   let tile={x:0,y:0,width:1,height:1,dpr:1},renderedTile=null;
-  let pointerInput,frameInput,inputCheck,crop=null,editingFrame=false,frameDrag=null,eraserAt=null,standardCrop=null,initialRegion=null;
+  let pointerInput,frameInput,inputCheck,crop=null,editingFrame=false,frameDrag=null,eraserAt=null,standardCrop=null,initialRegion=null,selectionCallback=null,pendingSnippet=null;
   const cropChanged=()=>onCropChange(clone(crop),originalHeight);
   const clone=value=>JSON.parse(JSON.stringify(value));
   const radius=()=>clamp(Number(find(".guide-radius").value)||100,10,1000);
@@ -89,6 +89,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
   for(const name of ["line","rect","ellipse","compass","protractor","pan","zoom"])presets[name]={...presets.shape};
   const presetKey=value=>value;
   function choose(next){
+    pendingSnippet=null;
     const oldKey=presetKey(tool),nextKey=presetKey(next);
     presets[oldKey]={color:find(".ink-color").value,width:find(".ink-width").value,opacity:find(".ink-opacity").value};
     cancel();tool=next;
@@ -307,12 +308,16 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     box.style.width=Math.abs(b.x-a.x)*scale+"px";box.style.height=Math.abs(b.y-a.y)*scale+"px";
   }
   function startPointer(event){
-    if(readOnly||!source)return false;
+    if((readOnly&&!selectionCallback)||!source)return false;
     event.preventDefault();
     const at=point(event);if(!at)return false;
     gesture={id:event.pointerId,contact:true,stabilize:find(".ink-stabilize").checked,pointerType:event.pointerType,start:at,time:event.timeStamp,scale,lastAngle:0,sweep:0};
-    if(event.altKey||tool==="zoom"){
+    if(selectionCallback||event.altKey||tool==="zoom"){
       gesture.zoomBox=true;gesture.end=at;showZoomBox(at,at);
+    }else if(pendingSnippet){
+      const width=Math.min(250,1000-at.x,(visibleHeight()-at.y)*pendingSnippet.ratio);
+      if(width<1){gesture=null;return false;}
+      gesture.snippet=true;draft={kind:"image",image:pendingSnippet.image,points:[at,{x:at.x+width,y:at.y+width/pendingSnippet.ratio}],width:1,opacity:1};
     }else if(tool==="eraser"){
       gesture.erase=true;erase(at);
     }else if(tool==="pan"||event.pointerType==="touch"){
@@ -336,6 +341,10 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     const at=point(event);if(!at)return;
     if(active.zoomBox){active.end=at;showZoomBox(active.start,at);return;}
     if(active.erase){erase(at);return;}
+    if(active.snippet){
+      const width=Math.min(Math.max(10,Math.abs(at.x-active.start.x)),1000-active.start.x,(visibleHeight()-active.start.y)*pendingSnippet.ratio);
+      draft.points[1]={x:active.start.x+width,y:active.start.y+width/pendingSnippet.ratio};redraw();onPreview();return;
+    }
     if(active.move){guide={x:active.center.x+at.x-active.start.x,y:active.center.y+at.y-active.start.y};}
     else if(tool==="compass"){
       const angle=direction(active.center,at);
@@ -363,8 +372,9 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
   function endPointer(event){
     if(event.pointerId!==gesture?.id)return;
     if(gesture.zoomBox){
-      const a=gesture.start,b=gesture.end,w=Math.abs(b.x-a.x),h=Math.abs(b.y-a.y);
-      cancel();
+      const a=gesture.start,b=gesture.end,w=Math.abs(b.x-a.x),h=Math.abs(b.y-a.y),selected=selectionCallback;
+      selectionCallback=null;cancel();
+      if(selected){if(w*scale>=4&&h*scale>=4)selected({x:Math.min(a.x,b.x),y:Math.min(a.y,b.y),width:w,height:h});return;}
       if(w*scale>=8&&h*scale>=8){
         const nextScale=Math.min((viewport.clientWidth-32)/w,(viewport.clientHeight-32)/h);
         layout(nextScale/(Math.max(80,viewport.clientWidth-32)/1000));
@@ -375,10 +385,11 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
       return;
     }
     // Do not append the lift packet. Several tablets report a reset position on lift.
-    const result=draft;
-    if(result&&["pen","highlighter"].includes(tool))finishContact(result,gesture);
+    const result=draft,wasSnippet=gesture.snippet;
+    if(result&&!wasSnippet&&["pen","highlighter"].includes(tool))finishContact(result,gesture);
     inputCheck?.processed(event,null,null,"end");cancel();
     if(result&&!result.guideOnly)edit([...marks,result]);
+    if(wasSnippet){pendingSnippet=null;choose("pen");status("Snippet placed. Undo removes it.");}
   }
   const inputSelect=find(".input-mode");
   let inputMode=defaultInputMode(navigator.userAgent);
@@ -416,7 +427,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
   find(".board-out").onclick=()=>{layout(zoom/1.3,{x:viewport.clientWidth/2,y:viewport.clientHeight/2});changed();};
   find(".board-fit").onclick=()=>{fit();changed();};find(".board-width").onclick=()=>{fit("width");changed();};
   find(".board-scratch").onchange=()=>{layout();changed();};
-  window.addEventListener("keydown",event=>{if(event.key==="Escape"&&gesture?.zoomBox){event.preventDefault();cancel();}});
+  window.addEventListener("keydown",event=>{if(event.key==="Escape"&&(gesture?.zoomBox||selectionCallback||pendingSnippet)){event.preventDefault();selectionCallback=null;pendingSnippet=null;cancel();}});
   viewport.onscroll=scheduleRender;
   viewport.addEventListener("wheel",event=>{
     if(!event.ctrlKey||readOnly)return;
@@ -441,7 +452,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
   setInterval(clock,200);
   async function setSource(next,initial=[],view={}){
     const current=++sceneVersion;generation++;renderTask?.cancel();cancel();
-    source=next;page=next.page||null;guide=null;eraserAt=null;positionEraser();undo=[];redo=[];renderedTile=null;
+    selectionCallback=null;pendingSnippet=null;source=next;page=next.page||null;guide=null;eraserAt=null;positionEraser();undo=[];redo=[];renderedTile=null;
     originalHeight=page?page.getViewport({scale:1}).height/page.getViewport({scale:1}).width*1000:next.image.naturalHeight/next.image.naturalWidth*1000;
     logicalHeight=originalHeight+Math.max(220,430);
     initialRegion=normalizeFrame(view.initialRegion,originalHeight);
@@ -452,6 +463,8 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
       kind:mark.tool||"pen",points:mark.points.map(([x,y])=>({x:x*1000,y:y*logicalHeight,p:.5})),
       color:mark.color,width:mark.width??(mark.tool==="highlighter"?13:3),opacity:mark.tool==="highlighter"?.31:1,pattern:"Solid",variable:false
     }):[];
+    await loadMarkImages(marks);
+    if(current!==sceneVersion)return;
     find(".board-scratch").checked=!teacher&&!!view.scratch;
     viewport.scrollTo(0,0);
     await new Promise(resolve=>requestAnimationFrame(resolve));
@@ -477,11 +490,35 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     const input=await PDFLib.PDFDocument.load(savedSource.bytes,{updateMetadata:false}),output=await PDFLib.PDFDocument.create();
     const [copy]=await output.copyPages(input,[savedSource.pageNumber-1]);output.addPage(copy);
     const view=savedPage.getViewport({scale:1});
-    for(const mark of savedMarks)saveAnnotation(output,copy,mark,p=>view.convertToPdfPoint(p.x*view.width/1000,p.y*view.width/1000));
+    for(const mark of savedMarks)await saveAnnotation(output,copy,mark,p=>view.convertToPdfPoint(p.x*view.width/1000,p.y*view.width/1000));
     return output.save({updateFieldAppearances:false});
   }
-  return {setSource,fit,fitDefaultView:()=>{if(initialRegion)zoomToRegion(initialRegion);else fit();},snapshot,nativePDF,getMarks:()=>clone(marks),
-    setMarks:value=>{marks=clone(value);redraw();},
+  async function snapshotRegion(region){
+    const savedPage=page,savedSource=source,savedMarks=clone(marks);
+    const output=document.createElement("canvas");
+    const factor=Math.min(4,2400/Math.max(region.width,region.height),Math.sqrt(6_000_000/(region.width*region.height)));
+    output.width=Math.ceil(region.width*factor);output.height=Math.ceil(region.height*factor);
+    const context=output.getContext("2d");context.fillStyle="#fff";context.fillRect(0,0,output.width,output.height);
+    if(savedPage){
+      const native=savedPage.getViewport({scale:1});
+      await savedPage.render({canvas:output,viewport:savedPage.getViewport({scale:1000*factor/native.width}),transform:[1,0,0,1,-region.x*factor,-region.y*factor]}).promise;
+    }else{
+      context.setTransform(factor,0,0,factor,-region.x*factor,-region.y*factor);
+      context.drawImage(savedSource.image,0,0,1000,originalHeight);
+    }
+    await loadMarkImages(savedMarks);
+    context.setTransform(factor,0,0,factor,-region.x*factor,-region.y*factor);
+    for(const mark of savedMarks)paintMark(context,mark);
+    return output.toDataURL("image/png");
+  }
+  return {setSource,fit,
+    zoomBy:factor=>layout(zoom*factor,{x:viewport.clientWidth/2,y:viewport.clientHeight/2}),
+    getScratch:()=>find(".board-scratch").checked,
+    cancelSelection:()=>{selectionCallback=null;cancel();},
+    selectRegion:callback=>{cancel();selectionCallback=callback;status("Drag a rectangle around the section to copy. Escape cancels.");},
+    placeSnippet:async(image,ratio)=>{if(!source)throw new Error("Open a teacher PDF first.");await loadMarkImages([{kind:"image",image}]);cancel();pendingSnippet={image,ratio};status("Click or drag on your page to place the snippet; drag farther right for a larger copy.");},
+    snapshotRegion,fitDefaultView:()=>{if(initialRegion)zoomToRegion(initialRegion);else fit();},snapshot,nativePDF,getMarks:()=>clone(marks),
+    setMarks:value=>{marks=clone(value);void loadMarkImages(marks).then(redraw).catch(console.error);redraw();},
     getCrop:()=>clone(crop),
     setCrop:value=>{const next=normalizeFrame(value,originalHeight);if(JSON.stringify(crop)===JSON.stringify(next))return;crop=next;if(readOnly)fit();else positionFrame();},
     getDisplayMarks:()=>clone(draft&&!draft.guideOnly?[...marks,draft]:marks),

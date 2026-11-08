@@ -29,6 +29,7 @@ db.exec(`
 `);
 if(!db.prepare("PRAGMA table_info(slides)").all().some(column=>column.name==="graph"))db.exec("ALTER TABLE slides ADD COLUMN graph TEXT");
 if(!db.prepare("PRAGMA table_info(slides)").all().some(column=>column.name==="pdf"))db.exec("ALTER TABLE slides ADD COLUMN pdf BLOB");
+if(!db.prepare("PRAGMA table_info(submissions)").all().some(column=>column.name==="work"))db.exec("ALTER TABLE submissions ADD COLUMN work TEXT");
 const query=Object.fromEntries(Object.entries({
   room:"SELECT * FROM rooms WHERE code=?",
   create:"INSERT INTO rooms VALUES(?,?,?)",
@@ -37,8 +38,8 @@ const query=Object.fromEntries(Object.entries({
   addSlide:"INSERT INTO slides(room,label,image,graph,pdf) VALUES(?,?,?,?,?)",
   slide:"SELECT image,pdf FROM slides WHERE room=? AND id=?",
   submissions:"SELECT id,slide,name,time FROM submissions WHERE room=? ORDER BY id DESC",
-  addSubmission:"INSERT INTO submissions(room,slide,name,time,image) VALUES(?,?,?,?,?)",
-  submission:"SELECT image FROM submissions WHERE room=? AND id=?"
+  addSubmission:"INSERT INTO submissions(room,slide,name,time,image,work) VALUES(?,?,?,?,?,?)",
+  submission:"SELECT image,slide,work FROM submissions WHERE room=? AND id=?"
 }).map(([name,sql])=>[name,db.prepare(sql)]));
 
 const types={".html":"text/html; charset=utf-8",".css":"text/css; charset=utf-8",
@@ -99,11 +100,11 @@ async function api(req,res,path) {
     query.create.run(code,title,hash(token));
     return send(res,201,{code,title,token});
   }
-  const match=/^\/api\/rooms\/([a-z0-9]{4}|[a-f0-9]{12})(?:\/(slides|submissions)(?:\/([1-9]\d{0,12})(?:\/(pdf))?)?)?$/i.exec(path);
+  const match=/^\/api\/rooms\/([a-z0-9]{4}|[a-f0-9]{12})(?:\/(slides|submissions)(?:\/([1-9]\d{0,12})(?:\/(pdf|work))?)?)?$/i.exec(path);
   if(!match) fail(404,"Unknown endpoint.");
   const [,rawCode,section,id,format]=match;
   const code=rawCode.toLowerCase();
-  if(format&&section!=="slides")fail(404,"Unknown endpoint.");
+  if(format&& !((section==="slides"&&format==="pdf")||(section==="submissions"&&format==="work")))fail(404,"Unknown endpoint.");
   const room=query.room.get(code);
   if(!room) fail(404,"Class session was not found or has been ended.");
   const teacher=authorized(req,room);
@@ -137,12 +138,33 @@ async function api(req,res,path) {
     return send(res,200,format==="pdf"?row.pdf:row.image,format==="pdf"?"application/pdf":"image/jpeg");
   }
   if(section==="submissions" && method==="POST" && !id) {
-    const body=await json(req,2_500_000);
+    const body=await json(req,6_000_000);
     if (!body || typeof body!=="object") fail(400,"Invalid request.");
     if(!Number.isSafeInteger(body.slide) || !query.slide.get(code,body.slide)) fail(404,"Slide is unavailable.");
     if(query.submissions.all(code).length>=500) fail(409,"This room already has 500 submissions.");
     const name=label(body.name,50,"Student");
-    query.addSubmission.run(code,body.slide,name,Date.now(),jpeg(body.image));
+    let work=null;
+    if(body.work!==undefined){
+      const value=body.work;
+      if(!value||value.version!==1||!["slide","graph"].includes(value.type))fail(400,"Invalid shared work.");
+      const encoded=JSON.stringify(value);
+      if(encoded.length>3_000_000)fail(413,"Shared annotations are too large.");
+      if(value.type==="slide"){
+        if(!Array.isArray(value.marks)||value.marks.length>3000)fail(400,"Invalid annotations.");
+        let totalPoints=0;
+        for(const mark of value.marks){
+          if(!mark||!["pen","highlighter","line","rect","ellipse","arc","path","image"].includes(mark.kind)||!Array.isArray(mark.points)||!mark.points.length)fail(400,"Invalid annotation.");
+          if(["line","rect","ellipse","image"].includes(mark.kind)&&mark.points.length!==2)fail(400,"Invalid shape points.");
+          totalPoints+=mark.points.length;
+          if(totalPoints>100000||mark.points.some(p=>!p||!Number.isFinite(p.x)||!Number.isFinite(p.y)||Math.abs(p.x)>100000||Math.abs(p.y)>100000))fail(400,"Invalid annotation points.");
+          if(!Number.isFinite(mark.width)||mark.width<=0||mark.width>60||!Number.isFinite(mark.opacity)||mark.opacity<0||mark.opacity>1)fail(400,"Invalid annotation style.");
+          if(mark.kind==="image"&&(typeof mark.image!=="string"||!/^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/.test(mark.image)))fail(400,"Invalid snippet image.");
+          if(mark.kind==="arc"&&(!Number.isFinite(mark.radius)||mark.radius<0||mark.radius>10000||!Number.isFinite(mark.start)||!Number.isFinite(mark.sweep)||Math.abs(mark.sweep)>Math.PI*2+.01))fail(400,"Invalid arc.");
+        }
+      }
+      work=encoded;
+    }
+    query.addSubmission.run(code,body.slide,name,Date.now(),jpeg(body.image),work);
     return send(res,201,{shared:true});
   }
   if(section==="submissions" && method==="GET") {
@@ -150,6 +172,7 @@ async function api(req,res,path) {
     if(!id) return send(res,200,{submissions:query.submissions.all(code)});
     const row=query.submission.get(code,Number(id));
     if(!row) fail(404,"Submission was not found.");
+    if(format==="work")return send(res,200,{slide:row.slide,native:!!query.slide.get(code,row.slide)?.pdf,work:row.work?JSON.parse(row.work):null});
     return send(res,200,row.image,"image/jpeg");
   }
   fail(405,"Method is unavailable.");

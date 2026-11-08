@@ -1,0 +1,25 @@
+Paperdesk — wider default view and dynamic shared work
+
+Replace server.mjs in your repository root, and the seven files in public/.
+Leave vendor assets alone. Deploy, then hard-refresh teacher and student pages.
+No environment changes are required; the server adds its storage column automatically.
+Deploy between sessions because Free Render deployments reset temporary data.
+
+The default frame is 1.3 times wider/taller (one zoom-out step). Click Standard
+slide view on the teacher side to replace an older saved crop. Students get
+the new default automatically for 24 x 12 inch PDFs.
+
+New PDF slide shares include annotation vectors and use the original revealed
+native PDF page. In Class panel > Shared work, open a share. Use +/- and Fit
+page to inspect it, and scroll to navigate. Old shares and graph shares still
+use image previews, which can also be zoomed and snipped.
+
+To copy work: open your teacher PDF, open a student share, choose Snip to my
+workspace, then drag a rectangle. The preview closes. Click on the teacher
+page to place the copy, or drag right to choose its width. Escape cancels.
+Snips are high-resolution PNGs (up to 2400 pixels along the longest side),
+not editable vector paths. Undo removes a placed snip; the partial eraser
+leaves snippets intact. They appear on the clean screen and in PDF exports.
+
+24 code checks passed, including new shared-work access and round-trip tests.
+Browser/device testing remains with you. Pen handling and smoothing retained.

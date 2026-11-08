@@ -1,3 +1,10 @@
+const markImages=new Map();
+export async function loadMarkImages(marks){
+  await Promise.all(marks.filter(mark=>mark.kind==="image").map(async mark=>{
+    if(markImages.has(mark.image))return;
+    const image=new Image();image.src=mark.image;await image.decode();markImages.set(mark.image,image);
+  }));
+}
 // Mark coordinates use PDF.js's scale-one viewport, with the origin at top left.
 const TAU = Math.PI * 2;
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -56,6 +63,11 @@ function eachStroke(mark, draw) {
 }
 
 function paintMark(ctx, mark) {
+  if(mark.kind==="image"){
+    const image=markImages.get(mark.image);if(!image)return;
+    const [a,b]=mark.points;ctx.save();ctx.globalAlpha=mark.opacity;
+    ctx.drawImage(image,Math.min(a.x,b.x),Math.min(a.y,b.y),Math.abs(b.x-a.x),Math.abs(b.y-a.y));ctx.restore();return;
+  }
   ctx.save();
   ctx.strokeStyle = mark.color;
   ctx.globalAlpha = mark.opacity;
@@ -85,7 +97,13 @@ function touches(mark, point) {
   });
 }
 
-function saveAnnotation(doc, page, mark, toPdf) {
+async function saveAnnotation(doc, page, mark, toPdf) {
+  if(mark.kind==="image"){
+    const [a,b]=mark.points,left=Math.min(a.x,b.x),top=Math.min(a.y,b.y),right=Math.max(a.x,b.x),bottom=Math.max(a.y,b.y);
+    const origin=toPdf({x:left,y:bottom}),end=toPdf({x:right,y:bottom}),upper=toPdf({x:left,y:top});
+    const image=await doc.embedPng(mark.image);
+    page.drawImage(image,{x:origin[0],y:origin[1],width:Math.hypot(end[0]-origin[0],end[1]-origin[1]),height:Math.hypot(upper[0]-origin[0],upper[1]-origin[1]),rotate:PDFLib.degrees(Math.atan2(end[1]-origin[1],end[0]-origin[0])*180/Math.PI),opacity:mark.opacity});return;
+  }
   const {PDFName, PDFHexString, PDFArray} = PDFLib;
   const ctx = doc.context;
   const num = value => Number(value.toFixed(5));

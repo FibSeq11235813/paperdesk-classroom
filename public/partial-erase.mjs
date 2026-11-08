@@ -1,6 +1,7 @@
 import {pathPoints} from './marks.mjs';
 // Clip vector centerlines against the circular brush, leaving editable vector fragments.
 function erasePath(mark,from,center,radius){
+  if(mark.kind==="image")return [mark];
   const points=pathPoints(mark),r=radius+mark.width/2;
   if(points.length===1){const p=points[0],dx=center.x-from.x,dy=center.y-from.y,t=Math.max(0,Math.min(1,((p.x-from.x)*dx+(p.y-from.y)*dy)/(dx*dx+dy*dy||1)));return Math.hypot(p.x-from.x-t*dx,p.y-from.y-t*dy)<=r?[]:[mark];}
   let fragments=[],current=[],travel=0,startOffset=0,hit=false;
