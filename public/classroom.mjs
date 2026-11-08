@@ -228,7 +228,11 @@ $("pageJump").onchange=()=>{
   const next=Math.max(1,Math.min(state.pdf.numPages,Math.round(Number($("pageJump").value)||1)));
   $("pageJump").value=next;if(next!==state.page){state.page=next;void renderPage();}
 };
-for(const [id,name] of [["prev","left"],["next","right"],["classPanelToggle","users"],["reveal","reveal"],["downloadPDF","download"]])iconButton($(id),name);
+for(const [id,name] of [["prev","left"],["next","right"],["classPanelToggle","users"],["downloadPDF","download"]])iconButton($(id),name);
+$("reveal").classList.add("reveal-class-action");
+$("reveal").innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4H3v13h18v-5 M8 21h8 M12 17v4 M15 2l1 3 3 1-3 1-1 3-1-3-3-1 3-1z M21 1v4 M19 3h4"/></svg><span>Reveal to class</span>';
+$("reveal").title="Give students their own copy of this page in their workspaces";
+$("reveal").setAttribute("aria-label","Reveal current page to student workspaces");
 // Distinguish launching the clean window from updating its content.
 $("presentPage").before($("openPresentation"));
 $("openPresentation").classList.add("presentation-action","open-screen-action");

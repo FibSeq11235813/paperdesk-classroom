@@ -155,3 +155,7 @@ body.workspace-active[data-workspace=teacher]>main{top:0}
 .pdf-share-actions .open-screen-action{background:#edf4fd;border-color:#9cb9df;color:#23588e}
 .pdf-share-actions .present-page-action{background:#176858;border-color:#176858;color:white}
 @media(max-width:850px){.pdf-navigation{flex-wrap:wrap}.pdf-share-actions{margin-left:auto}.pdf-share-actions .presentation-action{font-size:11px;padding:5px 7px}}
+
+.pdf-share-actions .reveal-class-action{display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;height:36px;padding:6px 10px;font-size:12px;flex:0 0 auto;background:#f1ebfb;border-color:#bba4de;color:#694394}
+.reveal-class-action svg{display:block;width:22px;height:22px;flex:0 0 auto}
+@media(max-width:850px){.pdf-share-actions{flex-wrap:wrap}.pdf-share-actions .reveal-class-action{font-size:11px;padding:5px 7px}}
