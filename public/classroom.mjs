@@ -228,7 +228,17 @@ $("pageJump").onchange=()=>{
   const next=Math.max(1,Math.min(state.pdf.numPages,Math.round(Number($("pageJump").value)||1)));
   $("pageJump").value=next;if(next!==state.page){state.page=next;void renderPage();}
 };
-for(const [id,name] of [["prev","left"],["next","right"],["classPanelToggle","users"],["reveal","reveal"],["presentPage","screen"],["openPresentation","screen"],["downloadPDF","download"]])iconButton($(id),name);
+for(const [id,name] of [["prev","left"],["next","right"],["classPanelToggle","users"],["reveal","reveal"],["downloadPDF","download"]])iconButton($(id),name);
+// Distinguish launching the clean window from updating its content.
+$("presentPage").before($("openPresentation"));
+$("openPresentation").classList.add("presentation-action","open-screen-action");
+$("openPresentation").innerHTML=icon("screen")+"<span>Open clean screen</span>";
+$("openPresentation").title="Open the separate clean-screen window for your second monitor";
+$("openPresentation").setAttribute("aria-label","Open clean screen window");
+$("presentPage").classList.add("presentation-action","present-page-action");
+$("presentPage").innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true" fill="currentColor"><path d="M7 4v16l14-8z"/></svg><span>Present page</span>';
+$("presentPage").title="Send the page you are viewing, with its annotations and frame, to the clean screen";
+$("presentPage").setAttribute("aria-label","Present current page on the clean screen");
 $("uploadIcon").innerHTML=icon("upload");
 $("prev").onclick=()=>{state.page--;void renderPage();};
 $("next").onclick=()=>{state.page++;void renderPage();};
