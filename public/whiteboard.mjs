@@ -1,3 +1,4 @@
+import {objectBounds,hitObject,moveObject,insideBox} from "./object-selection.mjs";
 import {bindTouchNavigation,touchView} from "./touch-navigation.mjs";
 import {icon,iconButton} from "./ui-icons.mjs";
 import {eraseSweep} from "./partial-erase.mjs";
@@ -37,7 +38,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
   root.innerHTML=`
     <div class="board-tools" ${readOnly?"hidden":""}>
       <div class="actions tool-rail" role="toolbar" aria-label="Drawing tools">
-        <button data-ink-tool="pen" aria-pressed="true">Pen</button><button data-ink-tool="highlighter">Highlighter</button><button data-ink-tool="eraser">Eraser</button>
+        <button data-ink-tool="select">Select and move</button><button data-ink-tool="pen" aria-pressed="true">Pen</button><button data-ink-tool="highlighter">Highlighter</button><button data-ink-tool="eraser">Eraser</button>
         <button data-ink-tool="line">Line</button><button data-ink-tool="rect">Rectangle</button><button data-ink-tool="ellipse">Ellipse</button>
         <button data-ink-tool="protractor">Protractor</button><button data-ink-tool="compass">Compass</button><button data-ink-tool="pan">Pan</button><button data-ink-tool="zoom" title="Alt + drag also zooms to a rectangle">Zoom box</button>
       </div>
@@ -86,6 +87,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     if(selection?.rangeCount&&root.contains(selection.anchorNode))selection.removeAllRanges();
   },true);
   let page=null,source=null,logicalHeight=700,originalHeight=700,marks=[],undo=[],redo=[],draft=null,gesture=null,guide=null;
+  let selectedObjects=new Set();
   let zoom=1,scale=1,tool="pen",renderTask=null,generation=0,renderTimer,drawFrame,baseWidth=700,sceneVersion=0;
   let tile={x:0,y:0,width:1,height:1,dpr:1},renderedTile=null;
   let pointerInput,frameInput,inputCheck,crop=null,editingFrame=false,frameDrag=null,eraserAt=null,standardCrop=null,initialRegion=null,selectionCallback=null,pendingSnippet=null,widthAdjustment=null;
@@ -108,16 +110,16 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     find(".guide-circle").hidden=tool!=="compass";
   }
   const presets={pen:{color:"#174a87",width:.5,opacity:100},highlighter:{color:"#ffdd3e",width:.5,opacity:32},shape:{color:"#174a87",width:.5,opacity:100},eraser:{color:"#174a87",width:25,opacity:100}};
-  for(const name of ["line","rect","ellipse","compass","protractor","pan","zoom"])presets[name]={...presets.shape};
+  for(const name of ["line","rect","ellipse","compass","protractor","pan","zoom","select"])presets[name]={...presets.shape};
   const presetKey=value=>value;
   function choose(next){
     finishWidthAdjustment();
     pendingSnippet=null;
     const oldKey=presetKey(tool),nextKey=presetKey(next);
     presets[oldKey]={color:find(".ink-color").value,width:find(".ink-width").value,opacity:find(".ink-opacity").value};
-    cancel();tool=next;
+    cancel();tool=next;if(tool!=="select")selectedObjects.clear();
     for(const button of root.querySelectorAll("[data-ink-tool]"))button.setAttribute("aria-pressed",String(button.dataset.inkTool===tool));
-    inkCanvas.style.cursor=tool==="pan"?"grab":"crosshair";
+    inkCanvas.style.cursor=tool==="pan"?"grab":tool==="select"?"default":"crosshair";
     if(oldKey!==nextKey){
       const preset=presets[nextKey];find(".ink-color").value=preset.color;find(".ink-width").value=preset.width;find(".ink-opacity").value=preset.opacity;
     }
@@ -288,6 +290,13 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
       ink.setTransform(1,0,0,1,0,0);ink.clearRect(0,0,inkCanvas.width,inkCanvas.height);
       ink.setTransform(scale*tile.dpr,0,0,scale*tile.dpr,-tile.x*tile.dpr,-tile.y*tile.dpr);
       for(const mark of marks)paintMark(ink,mark);
+      if(tool==="select"&&!readOnly){
+        ink.save();ink.strokeStyle="#087fe8";ink.lineWidth=1.5/scale;ink.setLineDash([6/scale,4/scale]);
+        for(const mark of selectedObjects)if(marks.includes(mark)){
+          const b=objectBounds(mark),pad=5/scale;ink.strokeRect(b.x-pad,b.y-pad,b.width+pad*2,b.height+pad*2);
+        }
+        ink.restore();
+      }
       if(!readOnly)guidePaint(ink);
       if(draft)paintMark(ink,draft);
     });
@@ -298,6 +307,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
   }
   function cancel(){
     const hadDraft=!!draft;
+    if(gesture?.objectOriginal){marks=gesture.objectOriginal;selectedObjects=gesture.objectSelected;}
     if(gesture?.eraseOriginal&&gesture.eraseOriginal!==marks){undo.push(gesture.eraseOriginal);if(undo.length>80)undo.shift();redo=[];changed();}
     find(".zoom-selection").hidden=true;gesture=null;draft=null;pointerInput?.reset();
     redraw();if(hadDraft)onPreview();
@@ -347,6 +357,17 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
       const width=Math.min(250,1000-at.x,(visibleHeight()-at.y)*pendingSnippet.ratio);
       if(width<1){gesture=null;return false;}
       gesture.snippet=true;draft={kind:"image",image:pendingSnippet.image,points:[at,{x:at.x+width,y:at.y+width/pendingSnippet.ratio}],width:1,opacity:1};
+    }else if(tool==="select"){
+      const hit=[...marks].reverse().find(mark=>hitObject(mark,at,8/scale));
+      if(hit){
+        if(event.shiftKey){if(selectedObjects.has(hit))selectedObjects.delete(hit);else selectedObjects.add(hit);}
+        else if(!selectedObjects.has(hit))selectedObjects=new Set([hit]);
+        gesture.objectOriginal=marks;gesture.objectSelected=new Set([...selectedObjects].filter(mark=>marks.includes(mark)));
+        gesture.objectMove=true;
+      }else{
+        if(!event.shiftKey)selectedObjects.clear();
+        gesture.objectBox=true;gesture.end=at;showZoomBox(at,at);
+      }
     }else if(tool==="eraser"){
       gesture.erase=true;erase(at);
     }else if(tool==="pan"){
@@ -368,6 +389,16 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
       viewport.scrollTop=active.scroll[1]-(event.clientY-active.client[1]);return;
     }
     const at=point(event);if(!at)return;
+    if(active.objectMove){
+      const dx=at.x-active.start.x,dy=at.y-active.start.y;
+      if(!active.objectMoved&&Math.hypot(dx,dy)*scale<3)return;
+      active.objectMoved=true;selectedObjects=new Set();
+      marks=active.objectOriginal.map(mark=>{
+        if(!active.objectSelected.has(mark))return mark;
+        const moved=moveObject(mark,dx,dy);selectedObjects.add(moved);return moved;
+      });redraw();onPreview();return;
+    }
+    if(active.objectBox){active.end=at;showZoomBox(active.start,at);return;}
     if(active.zoomBox){active.end=at;showZoomBox(active.start,at);return;}
     if(active.erase){erase(at);return;}
     if(active.snippet){
@@ -400,6 +431,15 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
   }
   function endPointer(event){
     if(event.pointerId!==gesture?.id)return;
+    if(gesture.objectMove){
+      const next=marks,selection=selectedObjects,moved=gesture.objectMoved;
+      cancel();if(moved){edit(next);selectedObjects=selection;redraw();}return;
+    }
+    if(gesture.objectBox){
+      const {start,end}=gesture;
+      for(const mark of marks)if(insideBox(mark,start,end))selectedObjects.add(mark);
+      cancel();return;
+    }
     if(gesture.zoomBox){
       const a=gesture.start,b=gesture.end,w=Math.abs(b.x-a.x),h=Math.abs(b.y-a.y),selected=selectionCallback;
       selectionCallback=null;cancel();
@@ -589,7 +629,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
   async function setSource(next,initial=[],view={}){
     finishWidthAdjustment();touchNavigation.reset();
     const current=++sceneVersion;generation++;renderTask?.cancel();cancel();
-    selectionCallback=null;pendingSnippet=null;source=next;page=next.page||null;guide=null;eraserAt=null;positionEraser();undo=[];redo=[];renderedTile=null;
+    selectionCallback=null;pendingSnippet=null;selectedObjects.clear();source=next;page=next.page||null;guide=null;eraserAt=null;positionEraser();undo=[];redo=[];renderedTile=null;
     originalHeight=page?page.getViewport({scale:1}).height/page.getViewport({scale:1}).width*1000:next.image.naturalHeight/next.image.naturalWidth*1000;
     logicalHeight=originalHeight+Math.max(220,430);
     initialRegion=normalizeFrame(view.initialRegion,originalHeight);
