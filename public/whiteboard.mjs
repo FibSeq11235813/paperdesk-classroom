@@ -1,4 +1,3 @@
-import "./pdf-compat.mjs";
 import {bindTouchNavigation,touchView} from "./touch-navigation.mjs";
 import {icon,iconButton} from "./ui-icons.mjs";
 import {eraseSweep} from "./partial-erase.mjs";
@@ -22,8 +21,8 @@ export function widthFromDrag(startWidth,deltaX){
 let renderer;
 export async function loadPDF(bytes){
   if(!renderer){
-    renderer=await import("./vendor/pdf.min.mjs");
-    renderer.GlobalWorkerOptions.workerSrc="/pdf-worker-compat.mjs";
+    renderer=await import("./vendor/pdf.legacy.min.mjs");
+    renderer.GlobalWorkerOptions.workerSrc="/vendor/pdf.worker.legacy.min.mjs";
   }
   return renderer.getDocument({data:new Uint8Array(bytes.slice(0)),isEvalSupported:false,useSystemFonts:false,
     cMapUrl:"/vendor/cmaps/",standardFontDataUrl:"/vendor/standard_fonts/",wasmUrl:"/vendor/wasm/"}).promise;

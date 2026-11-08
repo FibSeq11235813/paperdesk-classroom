@@ -466,7 +466,7 @@ async function loadSlide(slide){
         await nextDoc?.destroy().catch(()=>{});nextDoc=null;
         const res=await fetch(slideURL(slide.id),{cache:"no-store"});
         if(!res.ok)throw new Error("Slide preview returned HTTP "+res.status);
-        source={image:await imageFromBlob(await res.blob()),compatibilityPreview:true};
+        source={image:await imageFromBlob(await res.blob()),compatibilityPreview:true,pdfError:pdfError.message||String(pdfError)};
       }
     }else{
       const res=await fetch(slideURL(slide.id),{cache:"no-store"});
@@ -491,7 +491,7 @@ async function loadSlide(slide){
       settings.initialRegion=standardSlideFrame(1728,864);delete settings.zoom;
     }
     await studentBoard.setSource(source,initial,settings);
-    workStatus(source.compatibilityPreview?"Compatibility image loaded. Drawing is available; PDF detail may be reduced on this browser.":"Your work is saved in this browser as you draw.");
+    workStatus(source.compatibilityPreview?"Preview only — native PDF failed: "+source.pdfError+". Please share this message with your teacher.":"Your work is saved in this browser as you draw.");
     if(version!==state.boardVersion){await nextDoc?.destroy();return;}
     const old=studentDocument;studentDocument=nextDoc;if(old)void old.destroy().catch(()=>{});
     store.set("paperdesk.classroom.slide."+state.room,state.current);
