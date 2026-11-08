@@ -34,7 +34,7 @@ export function bytesToBase64(bytes){
   for(let offset=0;offset<bytes.length;offset+=32768)value+=String.fromCharCode(...bytes.subarray(offset,offset+32768));
   return btoa(value);
 }
-export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropChange=()=>{},classTimer=false,readOnly=false,teacher=false}={}){
+export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropChange=()=>{},classTimer=false,readOnly=false,autoFitOnResize=readOnly,teacher=false}={}){
   root.innerHTML=`
     <div class="board-tools" ${readOnly?"hidden":""}>
       <div class="actions tool-rail" role="toolbar" aria-label="Drawing tools">
@@ -554,7 +554,15 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     event.preventDefault();const rect=viewport.getBoundingClientRect();
     layout(zoom*Math.exp(-event.deltaY*.002),{x:event.clientX-rect.left,y:event.clientY-rect.top});changed();
   },{passive:false});
-  new ResizeObserver(()=>{if(source){if(readOnly)fit();else layout();}}).observe(viewport);
+  let observedWidth=-1,observedHeight=-1;
+  new ResizeObserver(()=>{
+    // Zoom can add scrollbars, triggering a resize notification without a
+    // changed window. Never interpret that notification as a request to fit.
+    const bounds=viewport.getBoundingClientRect();
+    if(Math.abs(bounds.width-observedWidth)<.5&&Math.abs(bounds.height-observedHeight)<.5)return;
+    observedWidth=bounds.width;observedHeight=bounds.height;
+    if(source){if(autoFitOnResize)fit();else layout();}
+  }).observe(viewport);
   let timerStart=null,timerElapsed=0;
   const target=()=>clamp(Number(find(".timer-minutes").value)||5,.1,180)*60000;
   const clock=()=>{

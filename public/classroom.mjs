@@ -352,7 +352,7 @@ async function refresh(){
 }
 setInterval(()=>void refresh(),1800);
 let submissionDocument,submissionGeneration=0;
-const submissionBoard=createWhiteboard($("submissionBoard"),{readOnly:true});
+const submissionBoard=createWhiteboard($("submissionBoard"),{readOnly:true,autoFitOnResize:false});
 async function viewSubmission(item,slide){
   const version=++submissionGeneration;
   let nextDoc;
