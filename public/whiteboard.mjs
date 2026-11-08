@@ -20,6 +20,8 @@ export function widthFromDrag(startWidth,deltaX){
 }
 let renderer;
 export async function loadPDF(bytes){
+  // Older Safari lacks this helper used by recent PDF.js builds.
+  if(!Promise.withResolvers)Promise.withResolvers=function(){let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return {promise,resolve,reject};};
   if(!renderer){
     renderer=await import("./vendor/pdf.min.mjs");
     renderer.GlobalWorkerOptions.workerSrc="/vendor/pdf.worker.min.mjs";

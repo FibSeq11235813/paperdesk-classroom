@@ -434,20 +434,32 @@ function updateLatest(){
   $("latest").onclick=()=>void loadSlide(latest);
 }
 
-let studentDocument;
+let studentDocument,studentLoadingSlide=null;
 async function loadSlide(slide){
-  if(!slide||!state.room||slide.id===state.current)return;
+  if(!slide||!state.room||studentLoadingSlide===slide.id)return;
+  studentLoadingSlide=slide.id;
+  const previousSlide=state.current;
   const version=++state.boardVersion;
   let nextDoc;
   try{
     let source;
     if(slide.native){
-      const res=await fetch(slideURL(slide.id)+"/pdf");
-      if(!res.ok)throw new Error("This PDF page is unavailable.");
-      const bytes=await res.arrayBuffer();nextDoc=await loadPDF(bytes);
-      source={bytes,page:await nextDoc.getPage(1),pageNumber:1};
+      try{
+        const res=await fetch(slideURL(slide.id)+"/pdf");
+        if(!res.ok)throw new Error("Native PDF page returned HTTP "+res.status);
+        const bytes=await res.arrayBuffer();nextDoc=await loadPDF(bytes);
+        source={bytes,page:await nextDoc.getPage(1),pageNumber:1};
+      }catch(pdfError){
+        console.warn("Native PDF could not open; trying the compatibility image.",pdfError);
+        await nextDoc?.destroy().catch(()=>{});nextDoc=null;
+        const res=await fetch(slideURL(slide.id),{cache:"no-store"});
+        if(!res.ok)throw new Error("Slide preview returned HTTP "+res.status);
+        source={image:await imageFromBlob(await res.blob()),compatibilityPreview:true};
+      }
     }else{
-      const image=new Image();image.src=slideURL(slide.id);await image.decode();source={image};
+      const res=await fetch(slideURL(slide.id),{cache:"no-store"});
+      if(!res.ok)throw new Error("Slide image returned HTTP "+res.status);
+      source={image:await imageFromBlob(await res.blob())};
     }
     if(version!==state.boardVersion){await nextDoc?.destroy();return;}
     const saved=store.get("paperdesk.classroom.work."+state.room+"."+slide.id,[]);
@@ -463,15 +475,23 @@ async function loadSlide(slide){
       settings.initialRegion=standardSlideFrame(pageView.width,pageView.height);
       if(settings.initialRegion)delete settings.zoom;
     }
+    if(source.compatibilityPreview&&Math.abs(source.image.naturalWidth/source.image.naturalHeight-2)<.02){
+      settings.initialRegion=standardSlideFrame(1728,864);delete settings.zoom;
+    }
     await studentBoard.setSource(source,initial,settings);
+    workStatus(source.compatibilityPreview?"Compatibility image loaded. Drawing is available; PDF detail may be reduced on this browser.":"Your work is saved in this browser as you draw.");
     if(version!==state.boardVersion){await nextDoc?.destroy();return;}
     const old=studentDocument;studentDocument=nextDoc;if(old)void old.destroy().catch(()=>{});
     store.set("paperdesk.classroom.slide."+state.room,state.current);
     paintSlideList();updateLatest();notice("");
   }catch(error){
-    if(version===state.boardVersion)notice("Could not load this slide. Try selecting it again.");
+    if(version===state.boardVersion){
+      state.current=previousSlide;
+      notice("Could not load this slide: "+(error.message||"unknown error")+". Tap its page button to retry.");
+    }
+    await nextDoc?.destroy().catch(()=>{});
     console.error(error);
-  }
+  }finally{if(version===state.boardVersion)studentLoadingSlide=null;}
 }
 $("share").onclick=async()=>{
   if(!state.room||state.current===null)return;
