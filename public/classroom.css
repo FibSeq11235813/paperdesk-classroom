@@ -159,3 +159,6 @@ body.workspace-active[data-workspace=teacher]>main{top:0}
 .pdf-share-actions .reveal-class-action{display:inline-flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap;height:36px;padding:6px 10px;font-size:12px;flex:0 0 auto;background:#f1ebfb;border-color:#bba4de;color:#694394}
 .reveal-class-action svg{display:block;width:22px;height:22px;flex:0 0 auto}
 @media(max-width:850px){.pdf-share-actions{flex-wrap:wrap}.pdf-share-actions .reveal-class-action{font-size:11px;padding:5px 7px}}
+.class-timer{display:flex;align-items:center;gap:7px;margin-left:auto;padding:3px 8px;background:#e8f3ee;border:1px solid #bdd4c8;border-radius:7px;font-size:11px;flex-wrap:wrap}
+.class-timer strong{font-size:11px}.class-timer output{font:700 20px ui-monospace,monospace;min-width:65px;color:#164e3d;font-variant-numeric:tabular-nums}.class-timer label{display:flex;align-items:center;gap:4px}.class-timer input{width:60px;padding:4px!important}.class-timer select{font:inherit;padding:4px;border:1px solid #aabed0;border-radius:5px}.class-timer button{font-size:11px;padding:4px 8px}.class-timer span{font-size:10px;color:#476556}
+#teacherBoard .board-timer,#studentBoard .board-timer{position:static;box-shadow:none;max-width:100%;margin:0;border-radius:0}

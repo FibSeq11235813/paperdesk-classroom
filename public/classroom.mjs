@@ -1,3 +1,4 @@
+import {createClassTimer} from "./class-timer.mjs";
 import {icon,iconButton} from "./ui-icons.mjs";
 import {frameForPage,standardSlideFrame} from "./presentation-frame.mjs";
 import {createGraph} from "./graph.mjs";
@@ -50,12 +51,16 @@ async function api(path,{method="GET",body,token,image=false}={}) {
   const headers={};
   if(body!==undefined) headers["Content-Type"]="application/json";
   if(token) headers.Authorization="Bearer "+token;
+  const requestStarted=performance.now();
   const res=await fetch(path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),cache:"no-store"});
   if(!res.ok) {
     const detail=await res.json().catch(()=>null);
     throw Object.assign(new Error(detail?.error||"Could not connect to the class."),{status:res.status});
   }
-  return image?res.blob():res.json();
+  if(image)return res.blob();
+  const value=await res.json();
+  if(value.serverTime!==undefined)value._serverNow=value.serverTime+(performance.now()-requestStarted)/2;
+  return value;
 }
 function button(text,callback) {
   const element=document.createElement("button");
@@ -72,6 +77,17 @@ function joinAddress(code){
   url.searchParams.set("join",code);
   return url.href;
 }
+const timerToggle=document.createElement("button");timerToggle.textContent="Class timer";timerToggle.title="Show or hide the synchronized class timer";
+const teacherTimerRoot=document.createElement("div"),studentTimerRoot=document.createElement("div");
+$("teacherSlideTab").parentElement.append(timerToggle,teacherTimerRoot);
+$("leave").before(studentTimerRoot);
+const teacherTimer=createClassTimer(teacherTimerRoot,{teacher:true,onCommand:async timer=>{
+  if(!state.room)return;
+  try{const result=await api(roomPath(),{method:"PATCH",token:state.token,body:{timer}});teacherTimer.sync(result.timer,result._serverNow);}
+  catch(error){notice(error.message);}
+}});
+const studentTimer=createClassTimer(studentTimerRoot);
+timerToggle.onclick=()=>void teacherTimer.toggle();
 api("/api/config").then(config=>{
   $("teacherPasswordWrap").hidden=!config.teacherPasswordRequired;
   $("teacherSignIn").hidden=!config.signInRequired;
@@ -105,6 +121,7 @@ async function teach(room) {
   $("teacherTitle").textContent=data.title;
   $("roomCode").textContent=room.code;
   $("joinLink").value=joinAddress(room.code);
+  teacherTimer.reset();teacherTimer.sync(data.timer,data._serverNow);
   show("teacher");
   void refresh();
 }
@@ -126,13 +143,13 @@ let pdfBytes,fileKey,currentTeacherKey=null,presentedKey=null,presentationState=
 const presentName=Array.from(crypto.getRandomValues(new Uint8Array(16)),value=>value.toString(16).padStart(2,"0")).join("");
 const presentationChannel=new BroadcastChannel("paperdesk-present-"+presentName);
 let presentationWindow;
-const teacherBoard=createWhiteboard($("teacherBoard"),{teacher:true,onChange:(marks)=>{
+const teacherBoard=createWhiteboard($("teacherBoard"),{teacher:true,classTimer:true,onChange:(marks)=>{
   if(currentTeacherKey)store.set(currentTeacherKey,{version:3,marks,crop:teacherBoard.getCrop()});
   if(currentTeacherKey===presentedKey)scheduleInkPresentation();
 },onCropChange:(crop,height)=>{
   if(fileKey)store.set("paperdesk.teacher.frame."+fileKey,{crop,height});
 },onPreview:()=>{if(currentTeacherKey===presentedKey)scheduleInkPresentation();}});
-const studentBoard=createWhiteboard($("studentBoard"),{onChange:(marks,view)=>{
+const studentBoard=createWhiteboard($("studentBoard"),{classTimer:true,onChange:(marks,view)=>{
   if(state.current===null)return;
   const saved=store.set(workKey(),{version:3,marks});
   store.set(workKey()+".view",view);
@@ -286,6 +303,7 @@ async function join(code,name){
   store.set("paperdesk.classroom.name",name);
   store.set("paperdesk.classroom.joined."+code,name);
   $("studentTitle").textContent=data.title;
+  studentTimer.reset();
   show("student");
   await updateStudent(data.slides);
 }
@@ -302,6 +320,7 @@ async function refresh(){
   try {
     const data=await api(roomPath(),{token:state.token});
     if(version!==state.sessionVersion)return;
+    (state.role==="student"?studentTimer:teacherTimer).sync(data.timer,data._serverNow);
     if(state.role==="student"){
       await updateStudent(data.slides);
     } else {

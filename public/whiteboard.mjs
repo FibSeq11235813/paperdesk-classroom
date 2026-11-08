@@ -32,7 +32,7 @@ export function bytesToBase64(bytes){
   for(let offset=0;offset<bytes.length;offset+=32768)value+=String.fromCharCode(...bytes.subarray(offset,offset+32768));
   return btoa(value);
 }
-export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropChange=()=>{},readOnly=false,teacher=false}={}){
+export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropChange=()=>{},classTimer=false,readOnly=false,teacher=false}={}){
   root.innerHTML=`
     <div class="board-tools" ${readOnly?"hidden":""}>
       <div class="actions tool-rail" role="toolbar" aria-label="Drawing tools">
@@ -563,11 +563,12 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     find(".timer-readout").textContent=Math.floor(remaining/60).toString().padStart(2,"0")+":"+(remaining%60).toString().padStart(2,"0");
     find(".timer-start").textContent=timerStart===null?"Start":"Pause";
   };
+  find(".board-timer-toggle").hidden=classTimer;
   find(".board-timer-toggle").onclick=()=>find(".board-timer").hidden=!find(".board-timer").hidden;
   find(".timer-start").onclick=()=>{if(timerStart===null){if(find(".timer-mode").value==="Countdown"&&timerElapsed>=target())timerElapsed=0;timerStart=performance.now();}else{timerElapsed+=performance.now()-timerStart;timerStart=null;}clock();};
   find(".timer-reset").onclick=find(".timer-minutes").onchange=()=>{timerElapsed=0;timerStart=null;clock();};
   find(".timer-mode").onchange=()=>{find(".timer-minutes-label").hidden=find(".timer-mode").value==="Stopwatch";timerElapsed=0;timerStart=null;clock();};
-  setInterval(clock,200);
+  if(!classTimer)setInterval(clock,200);
   async function setSource(next,initial=[],view={}){
     finishWidthAdjustment();touchNavigation.reset();
     const current=++sceneVersion;generation++;renderTask?.cancel();cancel();

@@ -1,3 +1,4 @@
+import {defaultClassTimer,updateClassTimer} from "./public/class-timer-state.mjs";
 import {createServer} from "node:http";
 import {randomBytes,randomInt,createHash,timingSafeEqual} from "node:crypto";
 import {mkdirSync,createReadStream} from "node:fs";
@@ -30,9 +31,10 @@ db.exec(`
 if(!db.prepare("PRAGMA table_info(slides)").all().some(column=>column.name==="graph"))db.exec("ALTER TABLE slides ADD COLUMN graph TEXT");
 if(!db.prepare("PRAGMA table_info(slides)").all().some(column=>column.name==="pdf"))db.exec("ALTER TABLE slides ADD COLUMN pdf BLOB");
 if(!db.prepare("PRAGMA table_info(submissions)").all().some(column=>column.name==="work"))db.exec("ALTER TABLE submissions ADD COLUMN work TEXT");
+if(!db.prepare("PRAGMA table_info(rooms)").all().some(column=>column.name==="timer"))db.exec("ALTER TABLE rooms ADD COLUMN timer TEXT");
 const query=Object.fromEntries(Object.entries({
   room:"SELECT * FROM rooms WHERE code=?",
-  create:"INSERT INTO rooms VALUES(?,?,?)",
+  create:"INSERT INTO rooms(code,title,teacher_hash) VALUES(?,?,?)",
   remove:"DELETE FROM rooms WHERE code=?",
   slides:"SELECT id,label,graph,CASE WHEN pdf IS NOT NULL THEN 1 ELSE 0 END AS native FROM slides WHERE room=? ORDER BY id",
   addSlide:"INSERT INTO slides(room,label,image,graph,pdf) VALUES(?,?,?,?,?)",
@@ -108,7 +110,17 @@ async function api(req,res,path) {
   const room=query.room.get(code);
   if(!room) fail(404,"Class session was not found or has been ended.");
   const teacher=authorized(req,room);
-  if(!section && method==="GET") return send(res,200,{code,title:room.title,slides:query.slides.all(code).map(slide=>({...slide,graph:slide.graph?JSON.parse(slide.graph):null})),teacher});
+  if(!section && method==="GET") return send(res,200,{code,title:room.title,slides:query.slides.all(code).map(slide=>({...slide,graph:slide.graph?JSON.parse(slide.graph):null})),teacher,timer:room.timer?JSON.parse(room.timer):defaultClassTimer(),serverTime:Date.now()});
+  if(!section && method==="PATCH") {
+    if(!teacher)fail(403,"Only the teacher can control the class timer.");
+    const body=await json(req,4096);
+    const current=query.room.get(code);
+    if(!current)fail(404,"Class session was not found.");
+    const now=Date.now();let timer;
+    try{timer=updateClassTimer(current.timer?JSON.parse(current.timer):defaultClassTimer(),body?.timer||{},now);}catch(error){fail(400,error.message);}
+    db.prepare("UPDATE rooms SET timer=? WHERE code=?").run(JSON.stringify(timer),code);
+    return send(res,200,{timer,serverTime:Date.now()});
+  }
   if(!section && method==="DELETE") {
     if(!teacher) fail(403,"Teacher access is required.");
     query.remove.run(code);
