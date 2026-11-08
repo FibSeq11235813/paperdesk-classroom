@@ -5,6 +5,14 @@ import {contactPoint,appendContact,finishContact} from "./tablet-input.mjs";
 import {bindPointerInput,defaultInputMode} from "./pointer-input.mjs";
 import {attachInputCheck} from "./input-check.mjs";
 import {normalizeFrame,adjustFrame} from "./presentation-frame.mjs";
+let activeInkBoard=null;
+export function historyShortcut(event){
+  if(event.defaultPrevented||event.isComposing||event.altKey||!(event.ctrlKey||event.metaKey))return null;
+  const key=event.key.toLowerCase();
+  if(key==="z")return event.shiftKey?"redo":"undo";
+  if(key==="y"&&!event.shiftKey)return "redo";
+  return null;
+}
 let renderer;
 export async function loadPDF(bytes){
   if(!renderer){
@@ -421,6 +429,25 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
   }
   find(".ink-undo").onclick=()=>{cancel();if(undo.length){redo.push(marks);marks=undo.pop();changed();redraw();}};
   find(".ink-redo").onclick=()=>{cancel();if(redo.length){undo.push(marks);marks=redo.pop();changed();redraw();}};
+  if(!readOnly){
+    const activate=()=>{activeInkBoard=root;};
+    root.addEventListener("pointerdown",activate,true);
+    root.addEventListener("mousedown",activate,true);
+    root.addEventListener("focusin",activate,true);
+    find(".ink-undo").title="Undo (Ctrl+Z / Cmd+Z)";
+    find(".ink-redo").title="Redo (Ctrl+Y / Ctrl+Shift+Z / Cmd+Shift+Z)";
+    find(".ink-undo").setAttribute("aria-keyshortcuts","Control+z Meta+z");
+    find(".ink-redo").setAttribute("aria-keyshortcuts","Control+y Control+Shift+z Meta+Shift+z");
+    window.addEventListener("keydown",event=>{
+      const action=historyShortcut(event);if(!action||!source||!root.getClientRects().length)return;
+      if(event.target instanceof Element&&event.target.closest("input,textarea,select,[contenteditable]:not([contenteditable=false]),[role=textbox]"))return;
+      const dialog=document.querySelector("dialog[open]");if(dialog&&!dialog.contains(root))return;
+      if(activeInkBoard&&activeInkBoard!==root&&activeInkBoard.getClientRects().length)return;
+      event.preventDefault();activeInkBoard=root;
+      // Use the same history actions as the toolbar, including an active eraser drag.
+      find(action==="undo"?".ink-undo":".ink-redo").onclick();
+    });
+  }
   find(".guide-circle").onclick=()=>{if(guide)edit([...marks,{...baseMark("arc",[guide]),radius:radius(),start:0,sweep:Math.PI*2}]);};
   find(".guide-radius").oninput=find(".guide-rotation").oninput=redraw;
   find(".board-in").onclick=()=>{layout(zoom*1.3,{x:viewport.clientWidth/2,y:viewport.clientHeight/2});changed();};
