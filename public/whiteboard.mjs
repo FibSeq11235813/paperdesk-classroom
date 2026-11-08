@@ -1,3 +1,4 @@
+import "./pdf-compat.mjs";
 import {bindTouchNavigation,touchView} from "./touch-navigation.mjs";
 import {icon,iconButton} from "./ui-icons.mjs";
 import {eraseSweep} from "./partial-erase.mjs";
@@ -20,11 +21,9 @@ export function widthFromDrag(startWidth,deltaX){
 }
 let renderer;
 export async function loadPDF(bytes){
-  // Older Safari lacks this helper used by recent PDF.js builds.
-  if(!Promise.withResolvers)Promise.withResolvers=function(){let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no;});return {promise,resolve,reject};};
   if(!renderer){
     renderer=await import("./vendor/pdf.min.mjs");
-    renderer.GlobalWorkerOptions.workerSrc="/vendor/pdf.worker.min.mjs";
+    renderer.GlobalWorkerOptions.workerSrc="/pdf-worker-compat.mjs";
   }
   return renderer.getDocument({data:new Uint8Array(bytes.slice(0)),isEvalSupported:false,useSystemFonts:false,
     cMapUrl:"/vendor/cmaps/",standardFontDataUrl:"/vendor/standard_fonts/",wasmUrl:"/vendor/wasm/"}).promise;
@@ -190,7 +189,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     if(!source||!viewport.clientWidth)return;
     cancel();
     const oldScale=scale;
-    zoom=clamp(nextZoom,.1,readOnly?100:10);
+    zoom=clamp(nextZoom,.1,100);
     baseWidth=Math.max(80,viewport.clientWidth-32);scale=baseWidth/1000*zoom;
     const region=readOnly&&crop?crop:{x:0,y:0,width:1000,height:visibleHeight()};
     clipElement.style.width=region.width*scale+"px";clipElement.style.height=region.height*scale+"px";
@@ -445,7 +444,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
       if(gesture?.eraseOriginal)marks=gesture.eraseOriginal;
       cancel();
       const rect=viewport.getBoundingClientRect(),x=metrics.x-rect.left,y=metrics.y-rect.top;
-      touchStart={zoom,scale,distance:metrics.distance,maxZoom:readOnly?100:10,
+      touchStart={zoom,scale,distance:metrics.distance,maxZoom:100,
         anchorX:(viewport.scrollLeft+x-16)/scale,anchorY:(viewport.scrollTop+y-16)/scale};
     },
     move:metrics=>{
