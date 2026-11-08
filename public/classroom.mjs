@@ -41,6 +41,7 @@ const cleanCode=code=>code.trim().toLowerCase().replace(/[\s-]/g,"");
 function show(section){
   document.body.classList.toggle("workspace-active",section!=="landing");
   document.body.dataset.workspace=section;
+  (section==="teacher"?$("teacherConnectionSlot"):document.querySelector("body > header")).append($("connection"));
   window.scrollTo(0,0);
   for(const id of ["landing","teacher","student"]) $(id).hidden=id!==section;
   notice("");
@@ -110,7 +111,7 @@ async function teach(room) {
 $("copy").onclick=async()=>{
   const field=$("joinLink");
   try {await navigator.clipboard.writeText(field.value);$("connection").textContent="Student link copied";}
-  catch {field.select();notice("Copy the selected student link.");}
+  catch {$("classPanel").hidden=false;$("classPanelToggle").setAttribute("aria-expanded","true");field.select();notice("Copy the selected student link.");}
 };
 $("end").onclick=async()=>{
   if(!confirm("End this class and delete its revealed slides and shared submissions from the server?")) return;

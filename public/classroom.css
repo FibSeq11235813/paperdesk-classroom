@@ -136,3 +136,16 @@ body.workspace-active #notice:empty{display:none}
  .pdf-navigation{padding-block:3px}
  #teacherBoard .board-tools,#studentBoard .board-tools{padding-block:4px}
 }
+/* Branding, lesson and student access share one teaching header. */
+body[data-workspace=teacher]>header{display:none}
+body.workspace-active[data-workspace=teacher]>main{top:0}
+.unified-teacher-header{height:48px;min-height:48px;padding:5px 12px;gap:12px;flex-wrap:nowrap;overflow:hidden;background:#202934;color:#f1f5fa;border-bottom:1px solid #344354}
+.teacher-brand{color:#fff;text-decoration:none;font-size:15px;font-weight:800;flex:0 0 auto;padding-right:12px;border-right:1px solid #536170}
+.unified-teacher-header .lesson-heading{flex:1 1 100px;min-width:0}.unified-teacher-header .lesson-heading h1{font-size:14px;max-width:none}
+.unified-teacher-header .class-code{flex:0 0 auto;gap:8px;color:#d2e7dd;font-size:11px}.unified-teacher-header .class-code code{font-size:19px;line-height:1;background:#dff4e9;border-radius:5px;color:#145d46;padding:5px 8px;letter-spacing:2px}
+.unified-teacher-header>#copy{font-size:12px;white-space:nowrap;padding:7px 9px;background:#176858;color:#fff;border-color:#408b76;flex:0 0 auto}
+.unified-teacher-header>#classPanelToggle{background:transparent;color:#e5edf5;border-color:#647486}.unified-teacher-header>#end{white-space:nowrap;flex:0 0 auto;padding:7px 9px}
+#teacherConnectionSlot{min-width:0;flex:0 1 180px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:10px}#teacherConnectionSlot:has(#connection:empty){display:none}#teacherConnectionSlot #connection{font-size:10px}
+.student-link-label{display:block;font-size:12px;margin:8px 0}.student-link-label input{display:block;margin-top:5px}
+@media(max-width:850px){#teacherConnectionSlot{display:none}.unified-teacher-header{gap:8px;padding-inline:8px}}
+@media(max-width:600px){.teacher-brand{font-size:12px;padding-right:6px}.unified-teacher-header{gap:5px}.unified-teacher-header .class-code span{display:none}.unified-teacher-header .class-code code{font-size:16px;letter-spacing:1px;padding:5px}.unified-teacher-header .lesson-heading h1{font-size:12px}.unified-teacher-header>#copy,.unified-teacher-header>#end{font-size:10px;padding:6px}.unified-teacher-header>#classPanelToggle{width:29px;min-width:29px;height:30px;padding:5px}}

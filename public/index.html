@@ -14,14 +14,13 @@
   <button id="resume" hidden>Resume teaching</button>
 </section>
 <section id="teacher" hidden>
-  <div class="teacher-topbar">
-    <div class="lesson-heading"><span class="eyebrow">Teacher desk</span><h1 id="teacherTitle"></h1></div>
+  <div class="teacher-topbar unified-teacher-header">
+    <a class="teacher-brand" href="/" aria-label="Paperdesk home">Paperdesk</a>
+    <div class="lesson-heading"><h1 id="teacherTitle"></h1></div>
+    <div class="class-code" role="group" aria-label="Student access"><span>Join code</span><code id="roomCode" aria-label="Student join code"></code></div>
+    <button id="copy" title="Copy student join link">Copy link</button>
+    <span id="teacherConnectionSlot"></span>
     <button id="classPanelToggle" aria-expanded="false" aria-controls="classPanel">Class panel</button><button id="end">End class</button>
-  </div>
-  <div class="student-access-bar" role="group" aria-label="Student access">
-    <div class="class-code"><span>Student join code</span><code id="roomCode" aria-label="Student join code"></code></div>
-    <input id="joinLink" aria-label="Student join link" readonly>
-    <button id="copy">Copy student link</button>
   </div>
   <div class="teacher-layout">
     <section class="panel preview">
@@ -37,7 +36,7 @@
       <div id="teacherGraphPanel" hidden><h2>Graph desk</h2><div id="teacherGraph"></div><button id="revealGraph" class="primary">Reveal graph to class</button></div>
     </section>
     <aside class="sidebar" id="classPanel" hidden>
-      <section class="panel"><h2>Class controls</h2><p>Browse pages privately. Present sends your selected page to the clean screen; Reveal gives students their own copy.</p><button id="example">Open example deck</button></section>
+      <section class="panel"><h2>Class controls</h2><label class="student-link-label">Student join link<input id="joinLink" aria-label="Student join link" readonly></label><p>Browse pages privately. Present sends your selected page to the clean screen; Reveal gives students their own copy.</p><button id="example">Open example deck</button></section>
       <section class="panel"><h2>Revealed slides</h2><ol id="revealed"></ol></section>
       <section class="panel"><h2>Shared work</h2><p id="shareEmpty">Student pages appear here when shared.</p><ul id="inbox"></ul></section>
     </aside>
