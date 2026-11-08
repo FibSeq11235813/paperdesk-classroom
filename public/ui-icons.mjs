@@ -1,4 +1,5 @@
 const paths={
+ trash:'M3 6h18 M9 6V3h6v3 M5 6l1 15h12l1-15 M10 10v7 M14 10v7',
  select:'M4 2v18l5-5 4 7 3-2-4-7h7L4 2z',
  pen:'m4 20 4-1 12-12-5-5L3 14l-1 8 6-3 M13 4l5 5',highlighter:'m5 15 9-12 7 5-9 12-7-5 M4 16l-2 5h8',eraser:'m3 13 9-10a2 2 0 0 1 3 0l6 6a2 2 0 0 1 0 3l-8 9H9l-6-6a2 2 0 0 1 0-2 M8 8l9 9 M13 21h9',
  line:'M4 20 20 4 M3 18v3h3 M18 3h3v3',rect:'M4 4h16v16H4z',ellipse:'M21 12a9 7 0 1 1-18 0 9 7 0 1 1 18 0',protractor:'M3 19a9 9 0 0 1 18 0H3 M12 10v3 M6 13l2 2 M18 13l-2 2 M12 19l5-5',compass:'M5 22 12 4l7 18 M9 12h6 M12 2v3 M5 18h14',pan:'M8 12V6a2 2 0 0 1 4 0v6 M12 10V4a2 2 0 0 1 4 0v8 M16 9a2 2 0 0 1 4 0v7c0 4-2 6-6 6h-2c-2 0-3-1-4-3l-4-6a2 2 0 0 1 3-2l1 1',zoom:'M3 9V3h6 M15 3h6v6 M21 15v6h-6 M9 21H3v-6 M8 12h8 M12 8v8',

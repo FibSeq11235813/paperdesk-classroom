@@ -22,3 +22,22 @@ export function moveObject(mark,dx,dy){return {...mark,points:mark.points.map(p=
 export function insideBox(mark,a,b){
   const box=objectBounds(mark);return box.x>=Math.min(a.x,b.x)&&box.y>=Math.min(a.y,b.y)&&box.x+box.width<=Math.max(a.x,b.x)&&box.y+box.height<=Math.max(a.y,b.y);
 }
+export function selectionBounds(marks){
+  if(!marks.length)return null;
+  const boxes=marks.map(objectBounds),x=Math.min(...boxes.map(b=>b.x)),y=Math.min(...boxes.map(b=>b.y));
+  return {x,y,width:Math.max(...boxes.map(b=>b.x+b.width))-x,height:Math.max(...boxes.map(b=>b.y+b.height))-y};
+}
+export function selectionCorners(box){return [
+  {x:box.x,y:box.y},{x:box.x+box.width,y:box.y},
+  {x:box.x+box.width,y:box.y+box.height},{x:box.x,y:box.y+box.height}
+];}
+export function resizeFactor(anchor,corner,dx,dy){
+  const x=corner.x-anchor.x,y=corner.y-anchor.y,length=x*x+y*y;
+  return length?Math.max(.02,Math.min(100,1+(dx*x+dy*y)/length)):1;
+}
+export function scaleObject(mark,anchor,factor){
+  const result={...mark,points:mark.points.map(p=>({...p,x:anchor.x+(p.x-anchor.x)*factor,y:anchor.y+(p.y-anchor.y)*factor}))};
+  if(mark.kind==='arc')result.radius=mark.radius*factor;
+  // Keep the chosen pen width while resizing geometry, including freehand ink.
+  return result;
+}

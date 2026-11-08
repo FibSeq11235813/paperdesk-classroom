@@ -1,4 +1,4 @@
-import {objectBounds,hitObject,moveObject,insideBox} from "./object-selection.mjs";
+import {objectBounds,hitObject,moveObject,insideBox,selectionBounds,selectionCorners,resizeFactor,scaleObject} from "./object-selection.mjs";
 import {bindTouchNavigation,touchView} from "./touch-navigation.mjs";
 import {icon,iconButton} from "./ui-icons.mjs";
 import {eraseSweep} from "./partial-erase.mjs";
@@ -50,7 +50,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
         <label>Input mode <select class="input-mode" aria-label="Drawing input mode"><option value="pointer">Standard pen / touch</option><option value="mouse">Bamboo / legacy mouse</option></select></label><label><input class="ink-stabilize" type="checkbox">Stabilize strokes</label><label><input class="ink-snap" type="checkbox">Snap</label><label title="Optional variable width for compatible pens. Stable fixed width is the default."><input class="ink-pressure" type="checkbox">Pen pressure</label>
       </div>
       <div class="actions">
-        <button class="ink-undo" disabled>Undo</button><button class="ink-redo" disabled>Redo</button><button class="board-out" aria-label="Zoom slide out">−</button><output class="board-zoom">100%</output><button class="board-in" aria-label="Zoom slide in">+</button>
+        <button class="ink-undo" disabled>Undo</button><button class="ink-redo" disabled>Redo</button><button class="selection-delete" disabled>Delete selected</button><button class="board-out" aria-label="Zoom slide out">−</button><output class="board-zoom">100%</output><button class="board-in" aria-label="Zoom slide in">+</button>
         <button class="board-fit">Fit page</button><button class="board-width">Fit width</button>
         <label ${teacher?"hidden":""}><input class="board-scratch" type="checkbox">Extra scratch space</label>
         <button class="board-timer-toggle">Timer</button>
@@ -68,7 +68,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
   const surface=find(".native-viewport");surface.before(boardStage);boardStage.append(surface,find(".tool-rail"));
   if(readOnly)find(".tool-rail").hidden=true;
   for(const button of root.querySelectorAll("[data-ink-tool]"))iconButton(button,button.dataset.inkTool);
-  for(const [selector,name] of [[".ink-undo","undo"],[".ink-redo","redo"],[".board-out","minus"],[".board-in","plus"],[".board-fit","fit"],[".board-width","width"],[".board-timer-toggle","timer"],[".frame-toggle","frame"],[".frame-standard","zoom"],[".frame-reset","screen"]])iconButton(find(selector),name);
+  for(const [selector,name] of [[".selection-delete","trash"],[".ink-undo","undo"],[".ink-redo","redo"],[".board-out","minus"],[".board-in","plus"],[".board-fit","fit"],[".board-width","width"],[".board-timer-toggle","timer"],[".frame-toggle","frame"],[".frame-standard","zoom"],[".frame-reset","screen"]])iconButton(find(selector),name);
   const settingsRow=find(".board-tools > .actions"),advanced=document.createElement("details");
   advanced.className="advanced-ink-settings";
   advanced.innerHTML=`<summary title="Input and ink settings" aria-label="Input and ink settings">${icon("settings")}</summary><div class="advanced-ink-content"></div>`;
@@ -102,6 +102,13 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     onChange(clone(marks),{zoom,scratch:find(".board-scratch").checked,crop:clone(crop)});onPreview();
   }
   function edit(next){undo.push(marks);if(undo.length>80)undo.shift();marks=next;redo=[];changed();redraw();}
+  function liveSelection(){return [...selectedObjects].filter(mark=>marks.includes(mark));}
+  function deleteSelection(){
+    cancel();const selected=new Set(liveSelection());if(!selected.size)return;
+    selectedObjects.clear();edit(marks.filter(mark=>!selected.has(mark)));
+  }
+  find(".selection-delete").onclick=deleteSelection;
+  find(".selection-delete").title="Delete selected (Delete / Backspace)";
   function geometry(){
     const active=["compass","protractor"].includes(tool);
     find(".geometry-tools").hidden=!active;
@@ -290,10 +297,20 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
       ink.setTransform(1,0,0,1,0,0);ink.clearRect(0,0,inkCanvas.width,inkCanvas.height);
       ink.setTransform(scale*tile.dpr,0,0,scale*tile.dpr,-tile.x*tile.dpr,-tile.y*tile.dpr);
       for(const mark of marks)paintMark(ink,mark);
+      find(".selection-delete").disabled=!liveSelection().length;
       if(tool==="select"&&!readOnly){
         ink.save();ink.strokeStyle="#087fe8";ink.lineWidth=1.5/scale;ink.setLineDash([6/scale,4/scale]);
         for(const mark of selectedObjects)if(marks.includes(mark)){
           const b=objectBounds(mark),pad=5/scale;ink.strokeRect(b.x-pad,b.y-pad,b.width+pad*2,b.height+pad*2);
+        }
+        const box=selectionBounds(liveSelection());
+        if(box){
+          ink.setLineDash([]);ink.strokeRect(box.x,box.y,box.width,box.height);
+          ink.fillStyle="#fff";
+          for(const corner of selectionCorners(box)){
+            const size=10/scale;ink.fillRect(corner.x-size/2,corner.y-size/2,size,size);
+            ink.strokeRect(corner.x-size/2,corner.y-size/2,size,size);
+          }
         }
         ink.restore();
       }
@@ -358,8 +375,13 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
       if(width<1){gesture=null;return false;}
       gesture.snippet=true;draft={kind:"image",image:pendingSnippet.image,points:[at,{x:at.x+width,y:at.y+width/pendingSnippet.ratio}],width:1,opacity:1};
     }else if(tool==="select"){
+      const selected=liveSelection(),bounds=selectionBounds(selected),corners=bounds?selectionCorners(bounds):[];
+      const handle=corners.findIndex(corner=>Math.hypot(corner.x-at.x,corner.y-at.y)<=14/scale);
       const hit=[...marks].reverse().find(mark=>hitObject(mark,at,8/scale));
-      if(hit){
+      if(handle>=0){
+        gesture.objectOriginal=marks;gesture.objectSelected=new Set(selected);gesture.objectMove=true;
+        gesture.resizeAnchor=corners[(handle+2)%4];gesture.resizeCorner=corners[handle];
+      }else if(hit){
         if(event.shiftKey){if(selectedObjects.has(hit))selectedObjects.delete(hit);else selectedObjects.add(hit);}
         else if(!selectedObjects.has(hit))selectedObjects=new Set([hit]);
         gesture.objectOriginal=marks;gesture.objectSelected=new Set([...selectedObjects].filter(mark=>marks.includes(mark)));
@@ -395,7 +417,8 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
       active.objectMoved=true;selectedObjects=new Set();
       marks=active.objectOriginal.map(mark=>{
         if(!active.objectSelected.has(mark))return mark;
-        const moved=moveObject(mark,dx,dy);selectedObjects.add(moved);return moved;
+        const moved=active.resizeAnchor?scaleObject(mark,active.resizeAnchor,resizeFactor(active.resizeAnchor,active.resizeCorner,dx,dy)):moveObject(mark,dx,dy);
+        selectedObjects.add(moved);return moved;
       });redraw();onPreview();return;
     }
     if(active.objectBox){active.end=at;showZoomBox(active.start,at);return;}
@@ -579,10 +602,12 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     find(".ink-undo").setAttribute("aria-keyshortcuts","Control+z Meta+z");
     find(".ink-redo").setAttribute("aria-keyshortcuts","Control+y Control+Shift+z Meta+Shift+z");
     window.addEventListener("keydown",event=>{
-      const action=historyShortcut(event);if(!action||!source||!root.getClientRects().length)return;
+      const deleting=event.key==="Delete"||event.key==="Backspace";
+      const action=historyShortcut(event);if((!action&&!deleting)||!source||!root.getClientRects().length)return;
       if(event.target instanceof Element&&event.target.closest("input,textarea,select,[contenteditable]:not([contenteditable=false]),[role=textbox]"))return;
       const dialog=document.querySelector("dialog[open]");if(dialog&&!dialog.contains(root))return;
       if(activeInkBoard&&activeInkBoard!==root&&activeInkBoard.getClientRects().length)return;
+      if(deleting){if(liveSelection().length){event.preventDefault();deleteSelection();}return;}
       event.preventDefault();activeInkBoard=root;
       // Use the same history actions as the toolbar, including an active eraser drag.
       find(action==="undo"?".ink-undo":".ink-redo").onclick();
