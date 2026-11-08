@@ -98,3 +98,13 @@ body.workspace-active #notice:not(:empty){position:fixed;left:16px;bottom:12px;z
 #teacherBoard .advanced-ink-content .input-check,#studentBoard .advanced-ink-content .input-check{position:static;max-width:none;width:100%;box-shadow:none;opacity:1;font-size:11px}
 #viewer{width:min(1240px,96vw);max-width:96vw;height:92dvh;max-height:96dvh;padding:0;overflow:hidden;border-radius:12px}
 #viewer[open]{display:flex;flex-direction:column}.submission-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;background:#202934;color:#fff}.submission-heading h2{font-size:15px}.submission-heading form{float:none;margin:0}.submission-controls{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:8px 12px;background:#f4f7fb;border-bottom:1px solid #cbd7e3;font-size:12px}#submissionStatus{color:#4a6078;font-size:11px}#submissionBoard{display:flex;flex-direction:column;flex:1;min-height:0}#submissionBoard .board-stage{flex:1;min-height:0;grid-template-columns:minmax(0,1fr)}#submissionBoard .native-viewport{height:100%;min-height:0}#submissionBoard .board-status{padding:5px 12px;font-size:11px}
+
+/* Student access stays visible independently of the lesson-title toolbar. */
+.teacher-topbar{flex-wrap:wrap}.lesson-heading{flex-basis:120px}
+.student-access-bar{display:flex;align-items:center;gap:12px;flex-shrink:0;flex-wrap:wrap;padding:7px 14px;background:#e3f3ed;border-bottom:1px solid #b7d8cb;min-height:48px}
+.student-access-bar .class-code{flex:0 0 auto;gap:10px;color:#254b3e}
+.student-access-bar .class-code span{font-size:12px;font-weight:700}
+.student-access-bar .class-code code{display:inline-block;background:white;border:1px solid #aacfc0;border-radius:6px;padding:4px 10px;font-size:21px;letter-spacing:2px;min-width:83px;text-align:center;line-height:1.2}
+.student-access-bar #joinLink{flex:1;min-width:170px;max-width:520px;font-size:12px;padding:6px 8px}
+.student-access-bar #copy{flex:0 0 auto;font-size:12px;padding:7px 10px;background:#176858;color:white;border-color:#176858}
+@media(max-width:600px){.student-access-bar{gap:6px;padding:5px 8px}.student-access-bar #joinLink{display:none}.student-access-bar .class-code span{font-size:11px}.student-access-bar .class-code code{font-size:18px}}

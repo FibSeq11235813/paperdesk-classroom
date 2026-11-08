@@ -41,6 +41,7 @@ const cleanCode=code=>code.trim().toLowerCase().replace(/[\s-]/g,"");
 function show(section){
   document.body.classList.toggle("workspace-active",section!=="landing");
   document.body.dataset.workspace=section;
+  window.scrollTo(0,0);
   for(const id of ["landing","teacher","student"]) $(id).hidden=id!==section;
   notice("");
 }
@@ -226,7 +227,7 @@ $("pageJump").onchange=()=>{
   const next=Math.max(1,Math.min(state.pdf.numPages,Math.round(Number($("pageJump").value)||1)));
   $("pageJump").value=next;if(next!==state.page){state.page=next;void renderPage();}
 };
-for(const [id,name] of [["prev","left"],["next","right"],["copy","copy"],["classPanelToggle","users"],["reveal","reveal"],["presentPage","screen"],["openPresentation","screen"],["downloadPDF","download"]])iconButton($(id),name);
+for(const [id,name] of [["prev","left"],["next","right"],["classPanelToggle","users"],["reveal","reveal"],["presentPage","screen"],["openPresentation","screen"],["downloadPDF","download"]])iconButton($(id),name);
 $("uploadIcon").innerHTML=icon("upload");
 $("prev").onclick=()=>{state.page--;void renderPage();};
 $("next").onclick=()=>{state.page++;void renderPage();};
