@@ -1,3 +1,4 @@
+import {bindTouchNavigation,touchView} from "./touch-navigation.mjs";
 import {icon,iconButton} from "./ui-icons.mjs";
 import {eraseSweep} from "./partial-erase.mjs";
 import {paintMark,saveAnnotation,loadMarkImages,polar,direction,distance,clamp} from "./marks.mjs";
@@ -339,7 +340,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
       gesture.snippet=true;draft={kind:"image",image:pendingSnippet.image,points:[at,{x:at.x+width,y:at.y+width/pendingSnippet.ratio}],width:1,opacity:1};
     }else if(tool==="eraser"){
       gesture.erase=true;erase(at);
-    }else if(tool==="pan"||event.pointerType==="touch"){
+    }else if(tool==="pan"){
       gesture.pan=true;gesture.client=[event.clientX,event.clientY];gesture.scroll=[viewport.scrollLeft,viewport.scrollTop];
     }else if(["compass","protractor"].includes(tool)){
       if(!guide||distance(guide,at)>radius()+22){guide=at;gesture=null;redraw();return false;}
@@ -433,6 +434,32 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     try{localStorage.setItem("paperdesk.input.mode",inputMode);}catch{/* The selected mode still works for this session. */}
     status(inputMode==="mouse"?"Bamboo / legacy mouse input · fixed pen width.":"Standard pen / touch input.");
   };
+  let touchStart=null;
+  const touchNavigation=bindTouchNavigation(viewport,{
+    enabled:()=>!!source,
+    ignore:()=>gesture?.pointerType==="pen",
+    start:metrics=>{
+      // Roll back an unfinished eraser gesture when the second finger arrives.
+      if(gesture?.eraseOriginal)marks=gesture.eraseOriginal;
+      cancel();
+      const rect=viewport.getBoundingClientRect(),x=metrics.x-rect.left,y=metrics.y-rect.top;
+      touchStart={zoom,scale,distance:metrics.distance,maxZoom:readOnly?100:10,
+        anchorX:(viewport.scrollLeft+x-16)/scale,anchorY:(viewport.scrollTop+y-16)/scale};
+    },
+    move:metrics=>{
+      if(!touchStart)return;
+      const rect=viewport.getBoundingClientRect();
+      const view=touchView(touchStart,{...metrics,x:metrics.x-rect.left,y:metrics.y-rect.top});
+      layout(view.zoom);viewport.scrollLeft=view.left;viewport.scrollTop=view.top;scheduleRender();
+    },
+    end:()=>{touchStart=null;scheduleRender();changed();}
+  });
+  // Touch always uses Pointer Events, even if a legacy mouse preference was saved.
+  viewport.addEventListener("pointerdown",event=>{
+    if(event.pointerType==="touch"&&inputMode==="mouse"){
+      inputSelect.value="pointer";configureInput();
+    }
+  },true);
   configureInput();
   const widthHUD=document.createElement("div");
   widthHUD.setAttribute("role","status");widthHUD.hidden=true;
@@ -542,7 +569,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
   find(".timer-mode").onchange=()=>{find(".timer-minutes-label").hidden=find(".timer-mode").value==="Stopwatch";timerElapsed=0;timerStart=null;clock();};
   setInterval(clock,200);
   async function setSource(next,initial=[],view={}){
-    finishWidthAdjustment();
+    finishWidthAdjustment();touchNavigation.reset();
     const current=++sceneVersion;generation++;renderTask?.cancel();cancel();
     selectionCallback=null;pendingSnippet=null;source=next;page=next.page||null;guide=null;eraserAt=null;positionEraser();undo=[];redo=[];renderedTile=null;
     originalHeight=page?page.getViewport({scale:1}).height/page.getViewport({scale:1}).width*1000:next.image.naturalHeight/next.image.naturalWidth*1000;
@@ -562,7 +589,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     await new Promise(resolve=>requestAnimationFrame(resolve));
     if(current!==sceneVersion)return;
     if(view.zoom)layout(view.zoom);else if(teacher&&crop)zoomToRegion(crop);else if(initialRegion)zoomToRegion(initialRegion);else fit();
-    changed();status(next.page?"Native PDF · Alt + drag to zoom into a rectangle.":"Image slide · Alt + drag to zoom into a rectangle.");
+    changed();status(next.page?"Native PDF · One finger draws; two fingers pan / pinch to zoom.":"Image slide · One finger draws; two fingers pan / pinch to zoom.");
   }
   async function snapshot(){
     if(!source)throw new Error("Open a page first.");
