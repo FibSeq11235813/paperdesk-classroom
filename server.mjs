@@ -191,7 +191,7 @@ async function api(req,res,path) {
 }
 async function staticFile(req,res,path) {
   if(!["GET","HEAD"].includes(req.method)) fail(405,"Method is unavailable.");
-  const relative=path==="/"?"index.html":decodeURIComponent(path.slice(1));
+  const relative=["/","/teach","/teach/","/join","/join/"].includes(path)?"index.html":decodeURIComponent(path.slice(1));
   const file=resolve(publicDir,relative);
   if(!file.startsWith(resolve(publicDir)+sep)) fail(404,"Not found.");
   const info=await stat(file).catch(()=>null);

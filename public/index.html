@@ -6,12 +6,14 @@
 <header><a class="brand" href="/">Paperdesk<span> Classroom</span></a><span id="connection" role="status"></span></header>
 <main>
 <section id="landing">
-  <p class="eyebrow">A workspace for live lessons</p><h1>One lesson.<br>Room for everyone to work.</h1>
+  <p class="eyebrow">A workspace for live lessons</p><h1 id="entryHeading">Paperdesk Classroom</h1>
+  <nav id="entryChoices" class="entry-choices" aria-label="Choose your workspace" hidden><a class="entry-link primary" href="/join">Join a class</a><a class="entry-link" href="/teach">Teacher access</a></nav>
   <div class="entrances">
-    <form id="create"><h2>Teach a class</h2><p>Open your PDF and reveal one page at a time.</p><label id="teacherPasswordWrap" hidden>Teacher password <input id="teacherPassword" type="password" autocomplete="current-password"></label><label>Lesson name <input id="title" maxlength="90" placeholder="Geometry practice"></label><button class="primary">Start a class</button><a id="teacherSignIn" hidden href="/signin-with-chatgpt?return_to=/" target="_top">Sign in to teach</a></form>
-    <form id="join"><h2>Join a class</h2><p>Get the revealed slides and your own scratch space.</p><label>Class code <input id="code" maxlength="20" required autocomplete="off" placeholder="Enter class code"></label><label>Display name <input id="name" maxlength="50" required autocomplete="nickname" placeholder="Your name"></label><button class="primary">Join class</button></form>
+    <form id="create" hidden><h2>Teach a class</h2><p>Open your PDF and reveal one page at a time.</p><label id="teacherPasswordWrap" hidden>Teacher password <input id="teacherPassword" type="password" autocomplete="current-password"></label><label>Lesson name <input id="title" maxlength="90" placeholder="Geometry practice"></label><button class="primary">Start a class</button><a id="teacherSignIn" hidden href="/signin-with-chatgpt?return_to=/teach" target="_top">Sign in to teach</a></form>
+    <form id="join" hidden><h2>Welcome to your workspace</h2><p>Enter your name and your teacher’s join code to get started.</p><label>Your name <input id="name" maxlength="50" required autocomplete="nickname" placeholder="Your name here"></label><label>Join code <input id="code" maxlength="12" required autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="4-character join code"></label><button class="primary">Join class</button></form>
   </div>
   <button id="resume" hidden>Resume teaching</button>
+  <a id="entrySwitch" class="entry-switch" hidden></a>
 </section>
 <section id="teacher" hidden>
   <div class="teacher-topbar unified-teacher-header">

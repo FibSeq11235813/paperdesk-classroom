@@ -73,7 +73,7 @@ function list(element,items,make) {
   }));
 }
 function joinAddress(code){
-  const url=new URL("/",location.href);
+  const url=new URL("/join",location.href);
   url.searchParams.set("join",code);
   return url.href;
 }
@@ -96,7 +96,19 @@ api("/api/config").then(config=>{
 const queryCode=cleanCode(new URLSearchParams(location.search).get("join")||"");
 $("code").value=queryCode;
 $("name").value=store.get("paperdesk.classroom.name","");
-$("resume").hidden=!!queryCode || !store.get(teacherKey);
+const entryPath=location.pathname.replace(/\/$/,"")||"/";
+const studentEntry=entryPath==="/join" || !!queryCode;
+const teacherEntry=entryPath==="/teach" && !studentEntry;
+if(studentEntry && entryPath!=="/join")history.replaceState(null,"",joinAddress(queryCode));
+$("create").hidden=!teacherEntry;
+$("join").hidden=!studentEntry;
+$("entryChoices").hidden=studentEntry||teacherEntry;
+$("entryHeading").textContent=studentEntry?"Join your class":teacherEntry?"Teacher workspace":"Paperdesk Classroom";
+document.title=(studentEntry?"Join a class":teacherEntry?"Teacher access":"Paperdesk")+" · Paperdesk Classroom";
+$("resume").hidden=!teacherEntry || !store.get(teacherKey);
+$("entrySwitch").hidden=!(studentEntry||teacherEntry);
+$("entrySwitch").href=studentEntry?"/teach":"/join";
+$("entrySwitch").textContent=studentEntry?"Teaching a class? Teacher access":"Looking for your class? Student join";
 $("create").onsubmit=async event=>{
   event.preventDefault();
   const submit=event.submitter;submit.disabled=true;
@@ -133,7 +145,7 @@ $("copy").onclick=async()=>{
 $("end").onclick=async()=>{
   if(!confirm("End this class and delete its revealed slides and shared submissions from the server?")) return;
   $("end").disabled=true;
-  try {await api(roomPath(),{method:"DELETE",token:state.token});store.remove(teacherKey);location.href="/";}
+  try {await api(roomPath(),{method:"DELETE",token:state.token});store.remove(teacherKey);location.href="/teach";}
   catch(error){notice(error.message);}
   finally{$("end").disabled=false;}
 };
@@ -307,7 +319,7 @@ async function join(code,name){
   show("student");
   await updateStudent(data.slides);
 }
-$("leave").onclick=()=>{store.remove("paperdesk.classroom.joined."+state.room);location.href="/";};
+$("leave").onclick=()=>{store.remove("paperdesk.classroom.joined."+state.room);location.href="/join";};
 if(queryCode){
   const previous=store.get("paperdesk.classroom.joined."+queryCode);
   if(previous) void join(queryCode,previous).catch(error=>notice(error.message));
