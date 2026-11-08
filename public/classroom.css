@@ -173,3 +173,12 @@ body.workspace-active[data-workspace=teacher]>main{top:0}
 .entry-switch{display:block;width:fit-content;margin:24px auto;color:#47637a;font-size:14px}
 #landing>#resume{display:block;margin:18px auto}
 #code{letter-spacing:.12em}
+
+/* Keep iPad long presses inside the drawing interaction. */
+.whiteboard-workspace,.whiteboard-workspace *{
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+}
+.whiteboard-workspace input,.whiteboard-workspace textarea,
+.whiteboard-workspace [contenteditable="true"]{
+  -webkit-user-select:text;user-select:text;-webkit-touch-callout:default;
+}

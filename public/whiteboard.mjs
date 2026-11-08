@@ -33,6 +33,7 @@ export function bytesToBase64(bytes){
   return btoa(value);
 }
 export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropChange=()=>{},classTimer=false,readOnly=false,autoFitOnResize=readOnly,teacher=false}={}){
+  root.classList.add("whiteboard-workspace");
   root.innerHTML=`
     <div class="board-tools" ${readOnly?"hidden":""}>
       <div class="actions tool-rail" role="toolbar" aria-label="Drawing tools">
@@ -76,6 +77,14 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
   boardStage.after(footer);
   const clipElement=find(".native-clip"),frameElement=find(".presentation-frame");
   const viewport=find(".native-viewport"),pageElement=find(".native-page"),pdfCanvas=find(".pdf-tile"),inkCanvas=find(".ink-tile"),ink=inkCanvas.getContext("2d");
+  // Safari's long press must stay a drawing gesture, not a text selection.
+  viewport.addEventListener("selectstart",event=>event.preventDefault());
+  viewport.addEventListener("contextmenu",event=>event.preventDefault());
+  viewport.addEventListener("pointerdown",event=>{
+    if(event.pointerType!=="touch"&&event.pointerType!=="pen")return;
+    const selection=window.getSelection();
+    if(selection?.rangeCount&&root.contains(selection.anchorNode))selection.removeAllRanges();
+  },true);
   let page=null,source=null,logicalHeight=700,originalHeight=700,marks=[],undo=[],redo=[],draft=null,gesture=null,guide=null;
   let zoom=1,scale=1,tool="pen",renderTask=null,generation=0,renderTimer,drawFrame,baseWidth=700,sceneVersion=0;
   let tile={x:0,y:0,width:1,height:1,dpr:1},renderedTile=null;
