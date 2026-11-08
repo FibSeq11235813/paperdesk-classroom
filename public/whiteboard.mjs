@@ -13,6 +13,10 @@ export function historyShortcut(event){
   if(key==="y"&&!event.shiftKey)return "redo";
   return null;
 }
+export function widthFromDrag(startWidth,deltaX){
+  const sensitivity=Math.max(.025,startWidth/150);
+  return Math.min(60,Math.max(.1,Math.round((startWidth+deltaX*sensitivity)*10)/10));
+}
 let renderer;
 export async function loadPDF(bytes){
   if(!renderer){
@@ -74,7 +78,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
   let page=null,source=null,logicalHeight=700,originalHeight=700,marks=[],undo=[],redo=[],draft=null,gesture=null,guide=null;
   let zoom=1,scale=1,tool="pen",renderTask=null,generation=0,renderTimer,drawFrame,baseWidth=700,sceneVersion=0;
   let tile={x:0,y:0,width:1,height:1,dpr:1},renderedTile=null;
-  let pointerInput,frameInput,inputCheck,crop=null,editingFrame=false,frameDrag=null,eraserAt=null,standardCrop=null,initialRegion=null,selectionCallback=null,pendingSnippet=null;
+  let pointerInput,frameInput,inputCheck,crop=null,editingFrame=false,frameDrag=null,eraserAt=null,standardCrop=null,initialRegion=null,selectionCallback=null,pendingSnippet=null,widthAdjustment=null;
   const cropChanged=()=>onCropChange(clone(crop),originalHeight);
   const clone=value=>JSON.parse(JSON.stringify(value));
   const radius=()=>clamp(Number(find(".guide-radius").value)||100,10,1000);
@@ -97,6 +101,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
   for(const name of ["line","rect","ellipse","compass","protractor","pan","zoom"])presets[name]={...presets.shape};
   const presetKey=value=>value;
   function choose(next){
+    finishWidthAdjustment();
     pendingSnippet=null;
     const oldKey=presetKey(tool),nextKey=presetKey(next);
     presets[oldKey]={color:find(".ink-color").value,width:find(".ink-width").value,opacity:find(".ink-opacity").value};
@@ -429,6 +434,59 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     status(inputMode==="mouse"?"Bamboo / legacy mouse input · fixed pen width.":"Standard pen / touch input.");
   };
   configureInput();
+  const widthHUD=document.createElement("div");
+  widthHUD.setAttribute("role","status");widthHUD.hidden=true;
+  widthHUD.style.cssText="position:fixed;z-index:1000;pointer-events:none;padding:7px 10px;border-radius:8px;background:#172b42;color:white;font:600 13px system-ui;box-shadow:0 3px 12px #0004;white-space:nowrap";
+  root.append(widthHUD);
+  const widthRing=document.createElement("div");widthRing.hidden=true;
+  widthRing.style.cssText="position:fixed;z-index:999;pointer-events:none;border:1px dotted #172b42;border-radius:50%;box-shadow:0 0 0 1px #fff9;box-sizing:border-box";
+  root.append(widthRing);
+  let suppressContextUntil=0;
+  function showWidthAdjustment(){
+    const width=Number(find(".ink-width").value),active=widthAdjustment;
+    if(!active)return;
+    widthHUD.hidden=widthRing.hidden=false;
+    widthHUD.textContent=`${tool==='eraser'?'Eraser':'Tool'} width ${width.toFixed(1)} · ← smaller / larger →`;
+    widthHUD.style.left=Math.max(8,Math.min(active.x+22,window.innerWidth-320))+"px";
+    widthHUD.style.top=Math.max(8,Math.min(active.y+24,window.innerHeight-44))+"px";
+    const diameter=Math.max(1,width*scale);
+    widthRing.style.width=widthRing.style.height=diameter+"px";
+    widthRing.style.left=(active.x-diameter/2)+"px";widthRing.style.top=(active.y-diameter/2)+"px";
+  }
+  function finishWidthAdjustment(revert=false){
+    if(!widthAdjustment)return;
+    if(revert)find(".ink-width").value=widthAdjustment.width.toFixed(1);
+    widthAdjustment=null;widthHUD.hidden=widthRing.hidden=true;
+    suppressContextUntil=performance.now()+500;positionEraser();
+  }
+  if(!readOnly){
+    function startWidthAdjustment(event){
+      if(!source||event.button!==2||!event.altKey||!["pen","highlighter","eraser","line","rect","ellipse","compass","protractor"].includes(tool))return;
+      event.preventDefault();event.stopImmediatePropagation();cancel();activeInkBoard=root;
+      viewport.focus({preventScroll:true});
+      widthAdjustment={x:event.clientX,y:event.clientY,width:clamp(Number(find(".ink-width").value)||.5,.1,60),id:event.pointerId};
+      suppressContextUntil=performance.now()+1000;showWidthAdjustment();
+    }
+    viewport.addEventListener("pointerdown",event=>{if(inputMode!=="mouse")startWidthAdjustment(event);},true);
+    viewport.addEventListener("mousedown",event=>{if(inputMode==="mouse")startWidthAdjustment(event);},true);
+    function moveWidthAdjustment(event){
+      if(!widthAdjustment)return;
+      if(widthAdjustment.id!==undefined&&event.pointerId!==widthAdjustment.id)return;
+      event.preventDefault();event.stopImmediatePropagation();
+      find(".ink-width").value=widthFromDrag(widthAdjustment.width,event.clientX-widthAdjustment.x).toFixed(1);
+      showWidthAdjustment();positionEraser();
+    }
+    window.addEventListener("pointermove",event=>{if(inputMode!=="mouse")moveWidthAdjustment(event);},true);
+    window.addEventListener("mousemove",event=>{if(inputMode==="mouse")moveWidthAdjustment(event);},true);
+    const endResize=event=>{if(widthAdjustment&&event.button===2){event.preventDefault();finishWidthAdjustment();}};
+    window.addEventListener("pointerup",event=>{if(inputMode!=="mouse")endResize(event);},true);
+    window.addEventListener("mouseup",event=>{if(inputMode==="mouse")endResize(event);},true);
+    viewport.addEventListener("contextmenu",event=>{if(widthAdjustment||event.altKey||performance.now()<suppressContextUntil)event.preventDefault();});
+    window.addEventListener("pointercancel",()=>finishWidthAdjustment(),true);
+    window.addEventListener("blur",()=>finishWidthAdjustment());
+    window.addEventListener("keydown",event=>{if(event.key==="Escape"&&widthAdjustment){event.preventDefault();finishWidthAdjustment(true);}});
+    find(".ink-width").title="Alt + right-click drag on the page to resize (left: smaller, right: larger)";
+  }
   if(!readOnly){
     inputCheck=attachInputCheck(root,inkCanvas,()=>inputMode,()=>stabilization.checked);
     advanced.lastElementChild.append(find(".input-check"));
@@ -484,6 +542,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
   find(".timer-mode").onchange=()=>{find(".timer-minutes-label").hidden=find(".timer-mode").value==="Stopwatch";timerElapsed=0;timerStart=null;clock();};
   setInterval(clock,200);
   async function setSource(next,initial=[],view={}){
+    finishWidthAdjustment();
     const current=++sceneVersion;generation++;renderTask?.cancel();cancel();
     selectionCallback=null;pendingSnippet=null;source=next;page=next.page||null;guide=null;eraserAt=null;positionEraser();undo=[];redo=[];renderedTile=null;
     originalHeight=page?page.getViewport({scale:1}).height/page.getViewport({scale:1}).width*1000:next.image.naturalHeight/next.image.naturalWidth*1000;
