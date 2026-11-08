@@ -319,6 +319,12 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     if((readOnly&&!selectionCallback)||!source)return false;
     event.preventDefault();
     const at=point(event);if(!at)return false;
+    // preventDefault keeps tablet input stable, but also suppresses native focus.
+    // Explicitly leave the join/name/width field before routing drawing shortcuts.
+    if(!readOnly){
+      activeInkBoard=root;
+      if(document.activeElement!==viewport)viewport.focus({preventScroll:true});
+    }
     gesture={id:event.pointerId,contact:true,stabilize:find(".ink-stabilize").checked,pointerType:event.pointerType,start:at,time:event.timeStamp,scale,lastAngle:0,sweep:0};
     if(selectionCallback||event.altKey||tool==="zoom"){
       gesture.zoomBox=true;gesture.end=at;showZoomBox(at,at);
