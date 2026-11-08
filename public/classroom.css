@@ -108,3 +108,31 @@ body.workspace-active #notice:not(:empty){position:fixed;left:16px;bottom:12px;z
 .student-access-bar #joinLink{flex:1;min-width:170px;max-width:520px;font-size:12px;padding:6px 8px}
 .student-access-bar #copy{flex:0 0 auto;font-size:12px;padding:7px 10px;background:#176858;color:white;border-color:#176858}
 @media(max-width:600px){.student-access-bar{gap:6px;padding:5px 8px}.student-access-bar #joinLink{display:none}.student-access-bar .class-code span{font-size:11px}.student-access-bar .class-code code{font-size:18px}}
+
+/* Constrain every workspace row to the actual window, reserving the footer. */
+body.workspace-active>main{position:fixed;top:40px;right:0;bottom:0;left:0;height:auto;min-height:0;overflow:hidden;margin:0}
+body.workspace-active #notice:empty{display:none}
+#teacher .teacher-layout{align-items:stretch;overflow:hidden}
+#teacher .preview{align-self:stretch;overflow:hidden}
+#teacherSlidePanel:not([hidden]),#studentSlidePanel:not([hidden]){overflow:hidden}
+#teacherBoard,#studentBoard,#submissionBoard{overflow:hidden}
+#teacherBoard .board-tools,#studentBoard .board-tools{overflow:visible;z-index:6}
+#teacherBoard .board-stage,#studentBoard .board-stage,#submissionBoard .board-stage{grid-template-rows:minmax(0,1fr);align-items:stretch;overflow:hidden;flex:1 1 0;min-width:0;min-height:0}
+#teacherBoard .native-viewport,#studentBoard .native-viewport,#submissionBoard .native-viewport{align-self:stretch;min-width:0;min-height:0;height:100%!important;max-height:100%;overflow:auto}
+.tool-rail{min-height:0;align-self:stretch;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-width:thin;padding:4px;gap:3px}
+.tool-rail .icon-button{flex:0 0 auto;width:36px;min-width:36px;height:clamp(26px,3.8dvh,36px);min-height:26px;padding:5px}
+#teacherBoard .board-footer,#studentBoard .board-footer{display:flex;flex:0 0 auto;position:relative;z-index:5;max-width:100%;min-height:40px;padding:4px 10px;gap:6px;overflow-x:auto;flex-wrap:nowrap}
+.board-footer .icon-button{flex:0 0 auto}.board-footer label{white-space:nowrap}.board-footer output{flex:0 0 auto}
+#teacherBoard .board-status,#studentBoard .board-status{flex:0 0 auto;line-height:1.3;min-height:17px;padding:2px 10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#student .student-layout{grid-template-rows:minmax(0,1fr);align-items:stretch;overflow:hidden}
+#student .work{overflow:hidden}
+@media(max-height:760px){
+ body.workspace-active>header{height:32px;min-height:32px}
+ body.workspace-active>main{top:32px}
+ .teacher-topbar{padding-block:4px}
+ .student-access-bar{padding-block:4px;min-height:40px}
+ .student-access-bar .class-code code{font-size:18px;padding-block:2px}
+ #teacher .view-tabs{padding-block:3px}
+ .pdf-navigation{padding-block:3px}
+ #teacherBoard .board-tools,#studentBoard .board-tools{padding-block:4px}
+}
