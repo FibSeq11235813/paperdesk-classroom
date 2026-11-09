@@ -208,3 +208,18 @@ body.workspace-active[data-workspace=teacher]>main{top:0}
 @media(prefers-reduced-motion:reduce){.widget-animate{animation:none}.spinner-wheel{transition:none}}
 
 .floating-tool-help{font-size:12px;line-height:1.5;margin:0 0 4px;color:#4c6379;width:100%}.floating-tool-body input,.floating-tool-body textarea{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
+/* Parameters stay in the upper toolbar; the floating dice are just objects. */
+#teacherBoard .board-tools,#studentBoard .board-tools{min-height:0}
+.dice-toolbar,.widget-settings-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:3px 0;font-size:12px}
+.dice-toolbar label,.widget-settings-toolbar label{display:inline-flex;align-items:center;gap:5px}
+.dice-toolbar output{font-weight:650;color:#1e5b80;max-width:100%;overflow-wrap:anywhere}
+.widget-settings-toolbar textarea{height:40px;min-height:36px;max-height:90px;width:150px;resize:vertical;font:inherit}
+.widget-settings-toolbar>small{max-width:330px;font-size:10px}.widget-settings-toolbar .widget-error{flex-basis:auto}
+.dice-object-stage{position:absolute;inset:0;overflow:auto;pointer-events:none;perspective:850px;scrollbar-width:thin}
+.floating-die-object{position:absolute;width:100px;height:100px;pointer-events:auto;touch-action:none;cursor:grab;outline:none;-webkit-user-select:none;user-select:none;filter:drop-shadow(0 16px 8px #16315133)}
+.floating-die-object:active{cursor:grabbing}.floating-die-object:focus-visible{outline:2px solid #2179ca;outline-offset:5px;border-radius:16px}
+.die-perspective{position:relative;width:100%;height:100%;perspective:650px;pointer-events:none;overflow:visible}
+.die-solid{position:absolute;left:50%;top:50%;width:0;height:0;transform-style:preserve-3d;-webkit-transform-style:preserve-3d;will-change:transform}
+.die-surface{position:absolute;left:-64px;top:-64px;width:128px;height:128px;transform-origin:64px 64px;backface-visibility:hidden;-webkit-backface-visibility:hidden;pointer-events:none}
+.die-surface svg{display:block;width:100%;height:100%;overflow:visible}
+@media(max-width:600px){.dice-toolbar,.widget-settings-toolbar{gap:5px;font-size:11px}.dice-toolbar select{max-width:140px}.widget-settings-toolbar>small{display:none}}

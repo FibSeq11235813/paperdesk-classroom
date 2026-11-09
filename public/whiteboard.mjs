@@ -80,10 +80,9 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
   settingsRow.append(advanced);
   const footer=find(".board-tools").children[1];footer.classList.add("board-footer");footer.hidden=readOnly;
   boardStage.after(footer);
-  const floating=readOnly?null:createFloatingTools(root);
-  if(floating){
-    const help=document.createElement("p");help.className="floating-tool-help";floating.inspector.append(help,settingsRow,find(".geometry-tools"));
-  }
+  const floating=readOnly?null:createFloatingTools(root,{onWidgetSelected:()=>{
+    settingsRow.hidden=true;find(".geometry-tools").hidden=true;
+  }});
   let allowedTools=defaultToolPolicy();
   const clipElement=find(".native-clip"),frameElement=find(".presentation-frame");
   const viewport=find(".native-viewport"),pageElement=find(".native-page"),pdfCanvas=find(".pdf-tile"),inkCanvas=find(".ink-tile"),ink=inkCanvas.getContext("2d");
@@ -147,18 +146,8 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
       const preset=presets[nextKey];find(".ink-color").value=preset.color;find(".ink-width").value=preset.width;find(".ink-opacity").value=preset.opacity;
     }
     geometry();positionEraser();redraw();
-    if(floating){
-      settingsRow.hidden=["pan","zoom","select"].includes(tool);
-      floating.inspector.querySelector(".floating-tool-help").textContent=({
-        select:"Tap to select; drag to move. Drag corner handles to resize. Delete removes the selection.",
-        pen:"Draw freehand. Click Width and scroll to adjust in tenths.",highlighter:"Draw translucent strokes; opacity is available in settings.",
-        eraser:"Erase part of a stroke using the circular brush.",point:"Tap to place a point. Geometry snapping can place it exactly on a line.",
-        line:"Drag to draw a line. Choose arrows and solid, dashed, or dotted strokes.",rect:"Drag opposite corners to draw a rectangle.",ellipse:"Drag a bounding box to draw an ellipse.",
-        compass:"Place the pin, set the radius with the tip, and drag the barrel to draw.",protractor:"Place the center and drag near the edge to measure angles.",
-        pan:"Drag the page to pan. Two fingers pan and pinch on touch screens.",zoom:"Drag a rectangle around the area to enlarge."
-      })[tool]||"";
-      floating.showInspector(TOOL_CATALOG[tool]+" settings");
-    }
+    settingsRow.hidden=false;floating?.activateDrawing();
+
   }
   for(const button of root.querySelectorAll("[data-ink-tool]"))button.onclick=()=>choose(button.dataset.inkTool);
   for(const color of ["#174a87","#161c25","#c52d42","#11714b","#8042ac","#ffdd3e","#f47c24","#ffffff"]){
@@ -797,7 +786,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
       for(const b of root.querySelectorAll("[data-ink-tool]"))b.hidden=!allowedTools[b.dataset.inkTool];
       if(!allowedTools[tool]){
         cancel();const fallback=["pen","pan","select","zoom"].find(key=>allowedTools[key]);
-        if(fallback)choose(fallback);else floating?.hideInspector();
+        if(fallback)choose(fallback);else {settingsRow.hidden=true;find(".geometry-tools").hidden=true;}
       }
     },
     zoomBy:factor=>layout(zoom*factor,{x:viewport.clientWidth/2,y:viewport.clientHeight/2}),
