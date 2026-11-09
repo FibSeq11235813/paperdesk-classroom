@@ -1,4 +1,5 @@
 const paths={
+ point:'M12 9a3 3 0 1 0 0 6 3 3 0 1 0 0-6 M12 2v4 M12 18v4 M2 12h4 M18 12h4',
  trash:'M3 6h18 M9 6V3h6v3 M5 6l1 15h12l1-15 M10 10v7 M14 10v7',
  select:'M4 2v18l5-5 4 7 3-2-4-7h7L4 2z',
  pen:'m4 20 4-1 12-12-5-5L3 14l-1 8 6-3 M13 4l5 5',highlighter:'m5 15 9-12 7 5-9 12-7-5 M4 16l-2 5h8',eraser:'m3 13 9-10a2 2 0 0 1 3 0l6 6a2 2 0 0 1 0 3l-8 9H9l-6-6a2 2 0 0 1 0-2 M8 8l9 9 M13 21h9',

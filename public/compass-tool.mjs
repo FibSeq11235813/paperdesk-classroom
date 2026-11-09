@@ -3,10 +3,11 @@ export function compassHandles(center,radius,angle,scale){
   const c=Math.cos(angle),s=Math.sin(angle),offset=Math.max(32/scale,radius*.32);
   return {pin:center,tip:{x:center.x+c*radius,y:center.y+s*radius},
     radius:{x:center.x+c*radius*.7-s*32/scale,y:center.y+s*radius*.7+c*32/scale},
-    rotate:{x:center.x+c*radius*.5+s*offset,y:center.y+s*radius*.5-c*offset}};
+    rotate:{x:center.x+c*radius*.5+s*offset,y:center.y+s*radius*.5-c*offset},
+    barrel:{x:center.x+c*radius*.825+s*offset*.35,y:center.y+s*radius*.825-c*offset*.35}};
 }
 export function compassHit(handles,point,scale){
-  return ['pin','tip','radius','rotate'].find(key=>Math.hypot(handles[key].x-point.x,handles[key].y-point.y)<=15/scale)||null;
+  return ['pin','tip','radius','rotate','barrel'].map(key=>({key,distance:Math.hypot(handles[key].x-point.x,handles[key].y-point.y)})).filter(hit=>hit.distance<=15/scale).sort((a,b)=>a.distance-b.distance)[0]?.key||null;
 }
 export function arcStep(previous,current){return Math.atan2(Math.sin(current-previous),Math.cos(current-previous));}
 export function paintCompass(ctx,center,radius,angle,scale,{locked,color,tip}){
@@ -47,7 +48,7 @@ export function paintCompass(ctx,center,radius,angle,scale,{locked,color,tip}){
   ctx.strokeStyle=locked?'#c24145':'#2874b8';ctx.lineWidth=1.5*u;
   ctx.beginPath();ctx.arc(h.pin.x,h.pin.y,5*u,0,TAU);ctx.stroke();
   ctx.font=`${10*u}px system-ui`;ctx.textAlign='center';
-  for(const [key,label] of [['pin',locked?'Pin locked':'Move pin'],['radius','Radius'],['rotate','Rotate'],['tip',tip]]){
+  for(const [key,label] of [['pin',locked?'Pin locked':'Move pin'],['radius','Radius'],['rotate','Rotate'],['tip','Set radius'],['barrel','Draw arc']]){
     const p=h[key],y=p.y+(key==='rotate'?-30:19)*u;
     ctx.lineWidth=3*u;ctx.strokeStyle='#fffffff0';ctx.strokeText(label,p.x,y);ctx.fillStyle='#263f54';ctx.fillText(label,p.x,y);
   }

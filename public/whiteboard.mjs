@@ -1,3 +1,4 @@
+import {snapGeometry} from "./geometry-snap.mjs";
 import {compassHandles,compassHit,arcStep,paintCompass} from "./compass-tool.mjs";
 import {objectBounds,hitObject,moveObject,insideBox,selectionBounds,selectionCorners,resizeFactor,scaleObject} from "./object-selection.mjs";
 import {bindTouchNavigation,touchView} from "./touch-navigation.mjs";
@@ -40,12 +41,12 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     <div class="board-tools" ${readOnly?"hidden":""}>
       <div class="actions tool-rail" role="toolbar" aria-label="Drawing tools">
         <button data-ink-tool="select">Select and move</button><button data-ink-tool="pen" aria-pressed="true">Pen</button><button data-ink-tool="highlighter">Highlighter</button><button data-ink-tool="eraser">Eraser</button>
-        <button data-ink-tool="line">Line</button><button data-ink-tool="rect">Rectangle</button><button data-ink-tool="ellipse">Ellipse</button>
+        <button data-ink-tool="point">Point</button><button data-ink-tool="line">Line</button><button data-ink-tool="rect">Rectangle</button><button data-ink-tool="ellipse">Ellipse</button>
         <button data-ink-tool="protractor">Protractor</button><button data-ink-tool="compass">Compass</button><button data-ink-tool="pan">Pan</button><button data-ink-tool="zoom" title="Alt + drag also zooms to a rectangle">Zoom box</button>
       </div>
       <div class="actions">
         <div class="ink-swatches"></div><label>Color <input class="ink-color" type="color" value="#174a87"></label>
-        <label>Width <input class="ink-width" aria-label="Pen width" type="number" min=".1" max="60" step=".1" value="0.5"></label>
+        <label><input class="object-snap" type="checkbox" checked>Snap to geometry</label><label class="line-arrows-label" hidden>Arrows <select class="line-arrows"><option value="none">None</option><option value="end">End</option><option value="start">Start</option><option value="both">Both ends</option></select></label><label>Width <input class="ink-width" aria-label="Pen width" type="number" min=".1" max="60" step=".1" value="0.5"></label>
         <label>Opacity % <input class="ink-opacity" aria-label="Ink opacity" type="number" min="5" max="100" value="100"></label>
         <label>Line style <select class="ink-pattern"><option>Solid</option><option>Dashed</option><option>Dotted</option></select></label>
         <label>Input mode <select class="input-mode" aria-label="Drawing input mode"><option value="pointer">Standard pen / touch</option><option value="mouse">Bamboo / legacy mouse</option></select></label><label><input class="ink-stabilize" type="checkbox">Stabilize strokes</label><label><input class="ink-snap" type="checkbox">Snap</label><label title="Optional variable width for compatible pens. Stable fixed width is the default."><input class="ink-pressure" type="checkbox">Pen pressure</label>
@@ -88,7 +89,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     if(selection?.rangeCount&&root.contains(selection.anchorNode))selection.removeAllRanges();
   },true);
   let page=null,source=null,logicalHeight=700,originalHeight=700,marks=[],undo=[],redo=[],draft=null,gesture=null,guide=null;
-  let compassAngle=0,compassLocked=false;
+  let compassAngle=0,compassLocked=false,snapIndicator=null;
   let selectedObjects=new Set();
   let zoom=1,scale=1,tool="pen",renderTask=null,generation=0,renderTimer,drawFrame,baseWidth=700,sceneVersion=0;
   let tile={x:0,y:0,width:1,height:1,dpr:1},renderedTile=null;
@@ -111,15 +112,20 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
   }
   find(".selection-delete").onclick=deleteSelection;
   find(".selection-delete").title="Delete selected (Delete / Backspace)";
+  function snapPoint(at,lines=true){
+    const result=find(".object-snap").checked?snapGeometry(at,marks,12/scale,{lines}):{point:at,target:false};
+    snapIndicator=result.target?result.point:null;return result.point;
+  }
   function geometry(){
+    find(".line-arrows-label").hidden=tool!=="line";
     const active=["compass","protractor"].includes(tool);
     find(".geometry-tools").hidden=!active;
-    find(".geometry-help").textContent=tool==="compass"?"Place the pin. Drag Radius to set the opening, Rotate to aim without ink, or the colored tip to draw. Width sets the ink thickness.":"Place the center, rotate the baseline, and drag near an edge to measure.";
+    find(".geometry-help").textContent=tool==="compass"?"Place the pin. Drag the tip to set the radius (snaps to points). Rotate aims without ink; drag the pencil barrel to draw. Width sets the ink thickness.":"Place the center, rotate the baseline, and drag near an edge to measure.";
     find(".rotation-label").hidden=find(".ray-label").hidden=tool!=="protractor";
     find(".guide-circle").hidden=find(".compass-controls").hidden=tool!=="compass";
   }
   const presets={pen:{color:"#174a87",width:.5,opacity:100},highlighter:{color:"#ffdd3e",width:.5,opacity:32},shape:{color:"#174a87",width:.5,opacity:100},eraser:{color:"#174a87",width:25,opacity:100}};
-  for(const name of ["line","rect","ellipse","compass","protractor","pan","zoom","select"])presets[name]={...presets.shape};
+  for(const name of ["line","rect","ellipse","compass","protractor","pan","zoom","select","point"])presets[name]={...presets.shape};
   const presetKey=value=>value;
   function choose(next){
     finishWidthAdjustment();
@@ -140,8 +146,9 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     button.setAttribute("aria-label","Ink color "+color);button.title=color;button.onclick=()=>find(".ink-color").value=color;find(".ink-swatches").append(button);
   }
   function baseMark(kind,points,event){
-    return {kind,points,width:clamp(Number(find(".ink-width").value)||.5,.1,60),
+    return {kind,points,width:kind==="point"?Math.max(3,Number(find(".ink-width").value)||.5):clamp(Number(find(".ink-width").value)||.5,.1,60),
       color:find(".ink-color").value,opacity:clamp(Number(find(".ink-opacity").value)||100,5,100)/100,
+      arrows:kind==="line"?find(".line-arrows").value:"none",
       pattern:["line","rect","ellipse","arc"].includes(kind)?find(".ink-pattern").value:"Solid",
       variable:kind==="pen"&&find(".ink-pressure").checked&&event?.pointerType==="pen"};
   }
@@ -320,6 +327,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
       }
       if(!readOnly)guidePaint(ink);
       if(draft)paintMark(ink,draft);
+      if(snapIndicator){ink.save();ink.strokeStyle="#e7469a";ink.lineWidth=2/scale;ink.setLineDash([]);ink.beginPath();ink.arc(snapIndicator.x,snapIndicator.y,8/scale,0,Math.PI*2);ink.stroke();ink.restore();}
     });
   }
   function point(event){
@@ -330,7 +338,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     const hadDraft=!!draft;
     if(gesture?.objectOriginal){marks=gesture.objectOriginal;selectedObjects=gesture.objectSelected;}
     if(gesture?.eraseOriginal&&gesture.eraseOriginal!==marks){undo.push(gesture.eraseOriginal);if(undo.length>80)undo.shift();redo=[];changed();}
-    find(".zoom-selection").hidden=true;gesture=null;draft=null;pointerInput?.reset();
+    snapIndicator=null;find(".zoom-selection").hidden=true;gesture=null;draft=null;pointerInput?.reset();
     redraw();if(hadDraft)onPreview();
   }
   function positionEraser(){
@@ -373,7 +381,8 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
   function startPointer(event){
     if((readOnly&&!selectionCallback)||!source)return false;
     event.preventDefault();
-    const at=point(event);if(!at)return false;
+    let at=point(event);if(!at)return false;
+    snapIndicator=null;if(["line","point"].includes(tool))at=snapPoint(at);
     // preventDefault keeps tablet input stable, but also suppresses native focus.
     // Explicitly leave the join/name/width field before routing drawing shortcuts.
     if(!readOnly){
@@ -408,7 +417,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     }else if(tool==="pan"){
       gesture.pan=true;gesture.client=[event.clientX,event.clientY];gesture.scroll=[viewport.scrollLeft,viewport.scrollTop];
     }else if(tool==="compass"){
-      if(!guide){guide={x:at.x,y:at.y};gesture=null;redraw();return false;}
+      if(!guide){guide={...snapPoint(at)};gesture=null;redraw();return false;}
       const handle=compassHit(compassHandles(guide,radius(),compassAngle,scale),at,scale);
       if(!handle||handle==="pin"&&compassLocked){gesture=null;redraw();return false;}
       gesture.center={...guide};gesture.compassHandle=handle;gesture.compassRadius=radius();
@@ -450,10 +459,15 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
       const width=Math.min(Math.max(10,Math.abs(at.x-active.start.x)),1000-active.start.x,(visibleHeight()-active.start.y)*pendingSnippet.ratio);
       draft.points[1]={x:active.start.x+width,y:active.start.y+width/pendingSnippet.ratio};redraw();onPreview();return;
     }
+    if(tool==="point"){redraw();return;}
     if(active.compassHandle){
       const angle=direction(active.center,at);
-      if(active.compassHandle==="pin")guide={x:active.center.x+at.x-active.start.x,y:active.center.y+at.y-active.start.y};
+      if(active.compassHandle==="pin")guide=snapPoint({x:active.center.x+at.x-active.start.x,y:active.center.y+at.y-active.start.y});
       else if(active.compassHandle==="radius")find(".guide-radius").value=clamp(active.compassRadius+((at.x-active.start.x)*Math.cos(active.originalAngle)+(at.y-active.start.y)*Math.sin(active.originalAngle))/.7,10,1000).toFixed(1);
+      else if(active.compassHandle==="tip"){
+        const target=snapPoint(at,false),r=distance(active.center,target);
+        if(r>=10&&r<=1000){find(".guide-radius").value=r;compassAngle=direction(active.center,target);}
+      }
       else if(active.compassHandle==="rotate")compassAngle=active.originalAngle+arcStep(active.grabAngle,angle);
       else{
         active.sweep=clamp(active.sweep+arcStep(active.lastAngle,angle),-Math.PI*2,Math.PI*2);
@@ -477,6 +491,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
         if(tool==="line")end=polar(active.start,distance(active.start,at),Math.round(direction(active.start,at)/(Math.PI/4))*Math.PI/4);
         else{const dx=at.x-active.start.x,dy=at.y-active.start.y,length=Math.max(Math.abs(dx),Math.abs(dy));end={x:active.start.x+Math.sign(dx||1)*length,y:active.start.y+Math.sign(dy||1)*length};}
       }
+      if(tool==="line"){const target=snapPoint(at);if(snapIndicator)end=target;}
       draft.points[1]=end;
     }
     redraw();onPreview();

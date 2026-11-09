@@ -32,6 +32,16 @@ function pathPoints(mark) {
   return mark.points;
 }
 
+export function arrowPaths(mark){
+  if(mark.kind!=="line"||!mark.arrows||mark.arrows==="none")return [];
+  const [a,b]=mark.points,length=distance(a,b);if(!length)return [];
+  const size=Math.min(Math.max(6,mark.width*5),length*.35),angle=direction(a,b),paths=[];
+  const head=(p,angle)=>[polar(p,size,angle-.45),p,polar(p,size,angle+.45)];
+  if(["start","both"].includes(mark.arrows))paths.push(head(a,angle));
+  if(["end","both"].includes(mark.arrows))paths.push(head(b,angle+Math.PI));
+  return paths;
+}
+
 function dashArray(mark) {
   if (mark.pattern === "Dashed") return [4*mark.width, 3*mark.width];
   if (mark.pattern === "Dotted") return [0.01, 3*mark.width];
@@ -60,6 +70,7 @@ function eachStroke(mark, draw) {
       draw(points, mark.width, dashArray(mark));
     }
   }
+  for(const arrow of arrowPaths(mark))draw(arrow,mark.width,[]);
 }
 
 function paintMark(ctx, mark) {
@@ -109,8 +120,9 @@ async function saveAnnotation(doc, page, mark, toPdf) {
   const num = value => Number(value.toFixed(5));
   const coords = point => toPdf(point).map(num);
   const points = pathPoints(mark).map(coords);
+  const appearancePoints=[...points,...arrowPaths(mark).flat().map(coords)];
   let left=Infinity,bottom=Infinity,right=-Infinity,top=-Infinity;
-  for (const [x,y] of points) {
+  for (const [x,y] of appearancePoints) {
     left=Math.min(left,x); right=Math.max(right,x);
     bottom=Math.min(bottom,y); top=Math.max(top,y);
   }
@@ -141,6 +153,7 @@ async function saveAnnotation(doc, page, mark, toPdf) {
   if (mark.kind==="line") {
     annotation.Subtype="Line";
     annotation.L=points.flat();
+    annotation.LE=[...["start","end"].map(end=>mark.arrows===end||mark.arrows==="both"?"OpenArrow":"None")];
   } else if (mark.kind==="ellipse" || mark.kind==="rect") {
     annotation.Subtype=mark.kind==="ellipse" ? "Circle" : "Square";
   } else {

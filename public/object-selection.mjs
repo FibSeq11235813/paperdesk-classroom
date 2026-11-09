@@ -1,6 +1,6 @@
-import {pathPoints} from './marks.mjs';
+import {pathPoints,arrowPaths} from './marks.mjs';
 export function objectBounds(mark){
-  const points=pathPoints(mark),padding=(mark.width||0)/2;
+  const points=[...pathPoints(mark),...arrowPaths(mark).flat()],padding=(mark.width||0)/2;
   let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
   for(const p of points){left=Math.min(left,p.x);top=Math.min(top,p.y);right=Math.max(right,p.x);bottom=Math.max(bottom,p.y);}
   return {x:left-padding,y:top-padding,width:right-left+padding*2,height:bottom-top+padding*2};
@@ -9,7 +9,7 @@ export function hitObject(mark,at,tolerance){
   if(mark.kind==='image'){
     const b=objectBounds(mark);return at.x>=b.x&&at.x<=b.x+b.width&&at.y>=b.y&&at.y<=b.y+b.height;
   }
-  const points=pathPoints(mark),radius=tolerance+(mark.width||0)/2;
+  const points=[...pathPoints(mark),...arrowPaths(mark).flatMap(path=>path.map((p,i)=>i? p:{...p,breakBefore:true}))],radius=tolerance+(mark.width||0)/2;
   for(let i=0;i<points.length;i++){
     const a=points[i],b=i&&!a.breakBefore?points[i-1]:a;
     const dx=b.x-a.x,dy=b.y-a.y,l=dx*dx+dy*dy;
