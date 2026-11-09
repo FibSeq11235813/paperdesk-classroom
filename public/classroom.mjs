@@ -1,3 +1,4 @@
+import {capturePresentationTools,watchPresentationTools} from "./presentation-tools.mjs";
 import {TOOL_CATALOG,defaultToolPolicy} from "./tool-policy.mjs";
 import {savedPageCount,clearPDFAnnotations,choosePDFMemory} from "./pdf-memory.mjs";
 import {createClassTimer} from "./class-timer.mjs";
@@ -86,7 +87,7 @@ $("teacherSlideTab").parentElement.append(timerToggle,teacherTimerRoot);
 $("leave").before(studentTimerRoot);
 const teacherTimer=createClassTimer(teacherTimerRoot,{teacher:true,onCommand:async timer=>{
   if(!state.room)return;
-  try{const result=await api(roomPath(),{method:"PATCH",token:state.token,body:{timer}});teacherTimer.sync(result.timer,result._serverNow);}
+  try{const result=await api(roomPath(),{method:"PATCH",token:state.token,body:{timer}});teacherTimer.sync(result.timer,result._serverNow);syncCleanTimer(result.timer,result._serverNow);}
   catch(error){notice(error.message);}
 }});
 const studentTimer=createClassTimer(studentTimerRoot);
@@ -136,7 +137,7 @@ async function teach(room) {
   $("teacherTitle").textContent=data.title;
   $("roomCode").textContent=room.code;
   $("joinLink").value=joinAddress(room.code);
-  teacherTimer.reset();teacherTimer.sync(data.timer,data._serverNow);applyClassTools(data.tools);
+  teacherTimer.reset();teacherTimer.sync(data.timer,data._serverNow);syncCleanTimer(data.timer,data._serverNow);applyClassTools(data.tools);
   show("teacher");
   void refresh();
 }
@@ -157,19 +158,23 @@ $("end").onclick=async()=>{
 let pdfBytes,fileKey,currentTeacherKey=null,presentedKey=null,presentationState=null,presentationTimer,inkPresentationTimer;
 const presentName=Array.from(crypto.getRandomValues(new Uint8Array(16)),value=>value.toString(16).padStart(2,"0")).join("");
 const presentationChannel=new BroadcastChannel("paperdesk-present-"+presentName);
-let presentationWindow;
+let presentationWindow,cleanTimerState=null;
+function syncCleanTimer(timer,serverTime){cleanTimerState={type:"timer",timer,serverTime};presentationChannel.postMessage(cleanTimerState);}
 const teacherBoard=createWhiteboard($("teacherBoard"),{teacher:true,classTimer:true,onChange:(marks)=>{
   if(currentTeacherKey)store.set(currentTeacherKey,{version:3,marks,crop:teacherBoard.getCrop()});
   if(currentTeacherKey===presentedKey)scheduleInkPresentation();
 },onCropChange:(crop,height)=>{
   if(fileKey)store.set("paperdesk.teacher.frame."+fileKey,{crop,height});
-},onPreview:()=>{if(currentTeacherKey===presentedKey)scheduleInkPresentation();}});
+},onPreview:()=>{if(currentTeacherKey===presentedKey)scheduleInkPresentation();if(teacherBoard.getToolOverlay())scheduleToolPresentation();}});
 const studentBoard=createWhiteboard($("studentBoard"),{classTimer:true,onChange:(marks,view)=>{
   if(state.current===null)return;
   const saved=store.set(workKey(),{version:3,marks});
   store.set(workKey()+".view",view);
   workStatus(saved?"Saved on this browser.":"Browser storage is unavailable. Keep this page open to preserve your work.");
 }});
+const presentationGuide=()=>currentTeacherKey===presentedKey?teacherBoard.getToolOverlay():null;
+const scheduleToolPresentation=watchPresentationTools($("teacherBoard"),data=>presentationChannel.postMessage(data),presentationGuide);
+function sendPresentationTools(){presentationChannel.postMessage(capturePresentationTools($("teacherBoard"),presentationGuide()));}
 const clearPDFButton=document.createElement("button");clearPDFButton.textContent="Clear this PDF’s annotations";
 clearPDFButton.title="Clear saved teacher annotations on every page of the open PDF";
 $("example").after(clearPDFButton);
@@ -226,7 +231,7 @@ function scheduleGraphPresentation(){
     presentationChannel.postMessage(presentationState);
   },100);
 }
-presentationChannel.onmessage=({data})=>{if(data.type==="ready"&&presentationState)presentationChannel.postMessage(presentationState);};
+presentationChannel.onmessage=({data})=>{if(data.type==="ready"){if(presentationState)presentationChannel.postMessage(presentationState);sendPresentationTools();if(cleanTimerState)presentationChannel.postMessage(cleanTimerState);}};
 $("openPresentation").onclick=()=>{
   presentationWindow=window.open("/present.html#"+presentName,"paperdesk-"+presentName,"popup,width=1200,height=800");
   if(!presentationWindow){notice("Allow the presentation window to open, then try Open clean screen again.");return;}
@@ -236,7 +241,7 @@ $("openPresentation").onclick=()=>{
 function presentCurrentPage(){
   const scene=teacherBoard.presentation();if(!scene)return;
   presentedKey=currentTeacherKey;presentationState={type:"source",...scene,label:"Page "+state.page};
-  presentationChannel.postMessage(presentationState);
+  presentationChannel.postMessage(presentationState);sendPresentationTools();
   $("connection").textContent="Presenting "+$("sourcePage").textContent;
 }
 $("presentPage").onclick=presentCurrentPage;
@@ -380,6 +385,7 @@ async function refresh(){
     const data=await api(roomPath(),{token:state.token});
     if(version!==state.sessionVersion)return;
     (state.role==="student"?studentTimer:teacherTimer).sync(data.timer,data._serverNow);
+    if(state.role==="teacher")syncCleanTimer(data.timer,data._serverNow);
     applyClassTools(data.tools);
     if(state.role==="student"){
       await updateStudent(data.slides);

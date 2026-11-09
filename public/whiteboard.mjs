@@ -95,7 +95,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     if(selection?.rangeCount&&root.contains(selection.anchorNode))selection.removeAllRanges();
   },true);
   let page=null,source=null,logicalHeight=700,originalHeight=700,marks=[],undo=[],redo=[],draft=null,gesture=null,guide=null;
-  let compassAngle=0,compassLocked=false,snapIndicator=null;
+  let compassAngle=0,compassLocked=false,snapIndicator=null,mirroredGuide=null;
   let selectedObjects=new Set();
   let zoom=1,scale=1,tool="pen",renderTask=null,generation=0,renderTimer,drawFrame,baseWidth=700,sceneVersion=0;
   let tile={x:0,y:0,width:1,height:1,dpr:1},renderedTile=null;
@@ -292,15 +292,16 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     const step=event.shiftKey?10:1,dx=event.key==="ArrowLeft"?-step:event.key==="ArrowRight"?step:0,dy=event.key==="ArrowUp"?-step:event.key==="ArrowDown"?step:0;
     crop=adjustFrame(crop,event.target.dataset.corner||"move",dx,dy,originalHeight);positionFrame();cropChanged();changed();
   };
-  function guidePaint(context){
-    if(!guide||!["compass","protractor"].includes(tool))return;
-    context.save();context.translate(guide.x,guide.y);context.strokeStyle="#176cc7";context.fillStyle="#176cc71f";context.lineWidth=1.2;
-    const r=radius();context.beginPath();
-    if(tool==="compass"){
-      context.restore();paintCompass(context,guide,r,compassAngle,scale,{locked:compassLocked,color:find(".ink-color").value,tip:find(".compass-tip").selectedOptions[0].textContent});return;
+  function guidePaint(context,overlay=null){
+    const activeGuide=overlay?.center||guide,activeTool=overlay?.tool||tool;
+    if(!activeGuide||!["compass","protractor"].includes(activeTool))return;
+    context.save();context.translate(activeGuide.x,activeGuide.y);context.strokeStyle="#176cc7";context.fillStyle="#176cc71f";context.lineWidth=1.2;
+    const r=overlay?.radius??radius();context.beginPath();
+    if(activeTool==="compass"){
+      context.restore();paintCompass(context,activeGuide,r,overlay?.angle??compassAngle,scale,{locked:overlay?.locked??compassLocked,color:overlay?.color??find(".ink-color").value,tip:overlay?.tip??find(".compass-tip").selectedOptions[0].textContent});return;
     }
     else {
-      context.rotate(rotation());context.arc(0,0,r,Math.PI,Math.PI*2);context.closePath();context.fill();context.stroke();
+      context.rotate(overlay?.rotation??rotation());context.arc(0,0,r,Math.PI,Math.PI*2);context.closePath();context.fill();context.stroke();
       context.font="11px system-ui";context.textAlign="center";context.fillStyle="#174a87";
       for(let angle=0;angle<=180;angle+=5){
         const a=-angle*Math.PI/180,major=angle%15===0,start=polar({x:0,y:0},r,a),end=polar({x:0,y:0},r-(major?10:5),a);
@@ -334,7 +335,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
         }
         ink.restore();
       }
-      if(!readOnly)guidePaint(ink);
+      if(!readOnly)guidePaint(ink);else if(mirroredGuide)guidePaint(ink,mirroredGuide);
       if(draft)paintMark(ink,draft);
       if(snapIndicator){ink.save();ink.strokeStyle="#e7469a";ink.lineWidth=2/scale;ink.setLineDash([]);ink.beginPath();ink.arc(snapIndicator.x,snapIndicator.y,8/scale,0,Math.PI*2);ink.stroke();ink.restore();}
     });
@@ -781,6 +782,8 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     return output.toDataURL("image/png");
   }
   return {setSource,fit,
+    getToolOverlay:()=>guide&&["compass","protractor"].includes(tool)?{tool,center:{...guide},radius:radius(),rotation:rotation(),angle:compassAngle,locked:compassLocked,color:find(".ink-color").value,tip:find(".compass-tip").selectedOptions[0].textContent}:null,
+    setToolOverlay:value=>{mirroredGuide=value;redraw();},
     setToolPolicy:value=>{
       allowedTools={...defaultToolPolicy(),...value};floating?.setPolicy(allowedTools);
       for(const b of root.querySelectorAll("[data-ink-tool]"))b.hidden=!allowedTools[b.dataset.inkTool];
