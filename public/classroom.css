@@ -243,3 +243,5 @@ body.workspace-active[data-workspace=teacher]>main{top:0}
 .presentation-tool-mirror{position:fixed;inset:0;z-index:10;pointer-events:none;overflow:hidden}.tool-mirror-scene{position:absolute;transform-origin:top left;pointer-events:none}.presentation-tool-mirror *{pointer-events:none!important}.presentation-tool-mirror .floating-tool-handle{cursor:default}.presentation-tool-mirror .coin-object-stage,.presentation-tool-mirror .dice-object-stage{scrollbar-width:none}
 
 .clean-class-timer{position:fixed;top:12px;right:12px;z-index:20;pointer-events:none;box-shadow:0 4px 16px #122c4433}
+
+.shared-objects-scene,.shared-objects-scene .die-perspective,.shared-objects-scene .coin-perspective{transform-style:preserve-3d;-webkit-transform-style:preserve-3d}

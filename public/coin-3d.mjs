@@ -21,6 +21,24 @@ export function coinPalette(style){const [outer,inner]=style.split('-');return {
 export const coinOutcome=(rng=randomUnit)=>rng()<.5?'Heads':'Tails';
 export function validateCoins(size,count){if(!Number.isInteger(size)||size<60||size>180||!Number.isInteger(count)||count<1||count>12)throw new Error('Use a size of 60–180 and 1–12 coins.');}
 export function coinImagePath(spec,side){return '/coins/'+spec[4][side==='Heads'?'heads':'tails']+'.webp';}
+let coinSequence=0;
+export function createCoinObject({currency,denomination,pixels}){
+ const spec=COIN_SETS[currency]?.[denomination];if(!spec)throw new Error('Unknown coin design.');validateCoins(pixels,1);
+ const palette=coinPalette(spec[2]),object=document.createElement('div');object.className='floating-coin-object';object.style.width=object.style.height=pixels+'px';
+ object.dataset.sharedKind='coin';object.dataset.sharedConfig=JSON.stringify({currency,denomination,pixels});object.dataset.syncId='coin-'+ ++coinSequence;
+   const scene=document.createElement('div');scene.className='coin-perspective';const solid=document.createElement('div');solid.className='coin-solid';scene.append(solid);object.append(scene);
+   for(let j=0;j<7;j++){const edge=document.createElement('div');edge.className='coin-thickness';edge.style.background=`radial-gradient(circle at 30% 20%,${palette.rim[2]},${palette.rim[0]} 60%,${palette.rim[1]})`;edge.style.transform=`translateZ(${j-3}px)`;if(spec[3]){edge.style.maskImage=edge.style.webkitMaskImage='radial-gradient(circle closest-side,transparent 0 15%,black 16%)';}solid.append(edge);}
+   for(const side of ['Heads','Tails']){
+    const face=document.createElement('div');face.className='coin-disc '+(side==='Heads'?'coin-heads':'coin-tails');const image=document.createElement('img');image.src=coinImagePath(spec,side);image.alt=spec[1]+' — '+side;image.draggable=false;face.append(image);solid.append(face);
+   }
+   solid.style.transform='rotateX(-16deg) rotateY(18deg)';
+ return {object,solid,spec};
+}
+export function setCoinResult(record,side){
+ if(!['Heads','Tails'].includes(side))throw new Error('Invalid coin result.');
+ record.object.dataset.result=side;record.object.setAttribute('aria-label',record.spec[1]+': '+side);
+ return side==='Heads'?'rotateX(0deg)':'rotateX(180deg)';
+}
 export function createCoinWidget(root,layer,activate){
  const controls=document.createElement('div');controls.className='coin-toolbar actions';controls.hidden=true;
  controls.innerHTML='<strong>Coins</strong><label>Currency <select name="currency"></select></label><label>Design / denomination <select name="denomination"></select></label><label>Size <input name="size" type="range" min="60" max="180" step="10" value="110"></label><label>How many <input name="count" type="number" min="1" max="12" value="1"></label><button class="primary" data-flip>Flip coins</button><button data-heads>Show heads</button><button data-tails>Show tails</button><button data-close>Hide coins</button><small class="coin-design-info"></small><a class="coin-source-link" target="_blank" rel="noopener noreferrer">Coin details / source</a><output aria-live="polite"></output>';
@@ -38,13 +56,10 @@ export function createCoinWidget(root,layer,activate){
   const spec=COIN_SETS[currency.value][+denomination.value];controls.querySelector(".coin-design-info").textContent=spec[4].detail;controls.querySelector(".coin-source-link").href=spec[4].source;
   const palette=coinPalette(spec[2]),gap=pixels+22,columns=Math.max(1,Math.floor((layer.clientWidth-20)/gap));
   for(let i=0;i<n;i++){
-   const object=document.createElement('div');object.className='floating-coin-object';object.style.width=object.style.height=pixels+'px';object.style.left=(12+i%columns*gap)+'px';object.style.top=(105+Math.floor(i/columns)*gap)+'px';object.tabIndex=0;object.setAttribute('role','button');object.setAttribute('aria-label',`${currency.value} ${spec[1]}. Click to flip; drag to move.`);
-   const scene=document.createElement('div');scene.className='coin-perspective';const solid=document.createElement('div');solid.className='coin-solid';scene.append(solid);object.append(scene);
-   for(let j=0;j<7;j++){const edge=document.createElement('div');edge.className='coin-thickness';edge.style.background=`radial-gradient(circle at 30% 20%,${palette.rim[2]},${palette.rim[0]} 60%,${palette.rim[1]})`;edge.style.transform=`translateZ(${j-3}px)`;if(spec[3]){edge.style.maskImage=edge.style.webkitMaskImage='radial-gradient(circle closest-side,transparent 0 15%,black 16%)';}solid.append(edge);}
-   for(const side of ['Heads','Tails']){
-    const face=document.createElement('div');face.className='coin-disc '+(side==='Heads'?'coin-heads':'coin-tails');const image=document.createElement('img');image.src=coinImagePath(spec,side);image.alt=spec[1]+' — '+side;image.draggable=false;image.onerror=()=>{output.textContent='Coin photograph could not load. Check that the public/coins folder was uploaded.';};face.append(image);solid.append(face);
-   }
-   solid.style.transform='rotateX(-16deg) rotateY(18deg)';stage.append(object);records.push({object,solid});
+   const record=createCoinObject({currency:currency.value,denomination:+denomination.value,pixels}),{object,solid}=record;
+   object.style.left=(12+i%columns*gap)+'px';object.style.top=(105+Math.floor(i/columns)*gap)+'px';object.tabIndex=0;object.setAttribute('role','button');object.setAttribute('aria-label',`${currency.value} ${spec[1]}. Click to flip; drag to move.`);
+   for(const image of solid.querySelectorAll('img'))image.onerror=()=>{output.textContent='Coin photographs could not load. Check public/coins.';};
+   stage.append(object);records.push(record);
    object.onpointerdown=e=>{
     if(e.button!==0||busy)return;select();e.preventDefault();object.setPointerCapture(e.pointerId);
     let moved=false;const start={x:e.clientX,y:e.clientY,left:object.offsetLeft,top:object.offsetTop};
@@ -61,7 +76,7 @@ export function createCoinWidget(root,layer,activate){
   try{
    await Promise.all(records.flatMap(record=>[...record.solid.querySelectorAll('img')].map(image=>image.decode())));
    await Promise.all(records.map(async(record,i)=>{
-    const previous=record.solid.style.transform,angle=outcomes[i]==='Heads'?0:180,final=`rotateX(${angle}deg)`;
+    const previous=record.solid.style.transform,angle=outcomes[i]==='Heads'?0:180,final=setCoinResult(record,outcomes[i]);
     record.solid.style.transform=final;
     const animation=playToolAnimation(record.solid,[{transform:previous},{offset:.3,transform:`translate3d(${i%2?15:-15}px,-85px,35px) rotateX(680deg) rotateY(25deg)`},{offset:.68,transform:`translateY(-32px) rotateX(${1440+angle}deg) rotateY(-15deg)`},{offset:.85,transform:`translateY(-10px) rotateX(${1800+angle}deg)`},{transform:final}],{duration:matchMedia('(prefers-reduced-motion: reduce)').matches?0:1550+i*90,easing:'cubic-bezier(.2,.6,.3,1)'});
     await animation.finished;record.object.dataset.result=outcomes[i];record.object.setAttribute('aria-label',`${outcomes[i]}. Click to flip; drag to move.`);
@@ -69,7 +84,7 @@ export function createCoinWidget(root,layer,activate){
   }catch(error){output.textContent='Coin images or animation could not load. Refresh after uploading all coin image files.';}finally{busy=false;for(const control of controls.querySelectorAll('input,select,button'))control.disabled=false;}
  }
  for(const [selector,side] of [['[data-heads]','Heads'],['[data-tails]','Tails']])controls.querySelector(selector).onclick=()=>{
-  if(busy)return;for(const record of records){record.solid.style.transform=side==='Heads'?'rotateX(0deg)':'rotateX(180deg)';record.object.setAttribute('aria-label',side+'. Click to flip; drag to move.');}output.textContent=side;
+  if(busy)return;for(const record of records){record.solid.style.transform=setCoinResult(record,side);record.object.setAttribute('aria-label',side+'. Click to flip; drag to move.');}output.textContent=side;
  };
  choices();currency.onchange=()=>{choices();rebuild();};denomination.onchange=count.onchange=rebuild;size.oninput=rebuild;
  controls.querySelector('[data-flip]').onclick=()=>void flip();controls.querySelector('[data-close]').onclick=()=>{controls.hidden=stage.hidden=true;};

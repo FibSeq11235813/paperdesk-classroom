@@ -1,6 +1,6 @@
 import {createClassTimer} from "./class-timer.mjs";
-import {createPresentationTools} from "./presentation-tools.mjs?sync=2";
-import {createWhiteboard,loadPDF} from "./whiteboard.mjs?sync=2";
+import {createPresentationTools} from "./presentation-tools.mjs?sync=3";
+import {createWhiteboard,loadPDF} from "./whiteboard.mjs?sync=3";
 const board=createWhiteboard(document.getElementById("presentationBoard"),{readOnly:true});
 const toolHost=document.createElement("div");document.body.append(toolHost);const tools=createPresentationTools(toolHost,guide=>board.setToolOverlay(guide));
 const timerHost=document.createElement("div");timerHost.className="clean-class-timer";document.body.append(timerHost);const classTimer=createClassTimer(timerHost);
@@ -10,7 +10,7 @@ const channel=new BroadcastChannel("paperdesk-present-"+name);
 let version=0,doc,pendingMarks=[],pendingCrop=null;
 channel.onmessage=async({data})=>{
   if(data.type==="timer"){classTimer.sync(data.timer,data.serverTime);return;}
-  if(data.type==="tools"){tools.update(data);if(data.children?.length)document.getElementById("presentationWait").hidden=true;return;}
+  if(data.type==="tools"){tools.update(data);if(data.children?.length||data.objects?.length)document.getElementById("presentationWait").hidden=true;return;}
   if(data.type==="marks"){pendingMarks=data.marks;pendingCrop=data.crop??null;board.setMarks(pendingMarks);board.setCrop(pendingCrop);return;}
   if(data.type!=="source")return;
   const current=++version;pendingMarks=data.marks||[];pendingCrop=data.crop??null;

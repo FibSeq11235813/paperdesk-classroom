@@ -44,6 +44,29 @@ export function faceRotation(normal,u,v){
  const axis=[normal[1],-normal[0],0];if(Math.hypot(...axis)<1e-8)return normal[2]>=0?'rotateX(0deg)':'rotateX(180deg)';
  return `rotate3d(${axis.join(',')},${angle}deg)`;
 }
+export function createDieObject({faces,index=0}){
+ const model=dieGeometry(faces>=20?20:faces);
+ const object=document.createElement('div');object.className='floating-die-object';
+ object.dataset.sharedKind='dice';object.dataset.sharedConfig=JSON.stringify({faces,index});object.dataset.syncId='die-'+ ++dieSequence;
+   const scene=document.createElement('div');scene.className='die-perspective';const solid=document.createElement('div');solid.className='die-solid';scene.append(solid);object.append(scene);
+   model.forEach((face,j)=>{
+    const surface=document.createElement('div');surface.className='die-surface';
+    const matrix=[...face.u,0,...face.v,0,...face.normal,0,...face.center,1];surface.style.transform=`matrix3d(${matrix.join(',')})`;
+    const number=faces===6?face.value:j%faces+1,id='die-finish-'+ ++dieSequence,hue=218+index*23;
+    surface.innerHTML=`<svg viewBox="-64 -64 128 128" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop stop-color="hsl(${hue} 65% 66%)"/><stop offset=".45" stop-color="hsl(${hue} 63% 45%)"/><stop offset="1" stop-color="hsl(${hue} 66% 27%)"/></linearGradient><radialGradient id="${id}-pip" cx="35%" cy="30%"><stop stop-color="#fff"/><stop offset=".7" stop-color="#ecf2fa"/><stop offset="1" stop-color="#a8b8cf"/></radialGradient></defs><path d="${roundedFacePath(face.points,faces===6?7:3)}" fill="url(#${id})" stroke="hsl(${hue} 48% 29%)" stroke-width="2" stroke-linejoin="round"/><path d="${roundedFacePath(face.points.map(p=>p.map(v=>v*.955)),faces===6?6:3)}" fill="none" stroke="#ffffff38" stroke-width="1"/>${faces===6?DIE_PIPS[number].map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="4.9" fill="#18335388"/><circle cx="${p[0]}" cy="${p[1]+.7}" r="3.9" fill="url(#${id}-pip)"/>`).join(''):`<text x="0" y="6" text-anchor="middle" fill="#f7fbff" font-size="20" font-family="system-ui" font-weight="700">${number}</text>`}</svg>`;
+    solid.append(surface);
+   });
+   solid.style.transform=restPose(model.find(face=>face.value===1)||model[0]);
+ return {object,solid,model,faces};
+}
+export function setDieResult(record,value){
+ if(!Number.isInteger(value)||value<1||value>record.faces)throw new Error('Invalid die result.');
+ const index=record.faces===6?record.model.findIndex(face=>face.value===value):(value-1)%record.model.length;
+ const text=record.solid.children[index].querySelector('text');if(text)text.textContent=value;
+ record.object.dataset.result=String(value);
+ record.object.setAttribute('aria-label',`Die result: ${value} on d${record.faces}`);
+ return faceRotation(record.model[index].normal,record.model[index].u,record.model[index].v);
+}
 export function createDiceWidget(root,layer,activate){
  const controls=document.createElement('div');controls.className='dice-toolbar actions';controls.hidden=true;
  controls.innerHTML='<strong>Dice</strong><label>Type <select name="type"><option value="6">d6 · Cube</option><option value="4">d4 · Tetrahedron</option><option value="8">d8 · Octahedron</option><option value="10">d10</option><option value="12">d12 · Dodecahedron</option><option value="20">d20 · Icosahedron</option><option value="100">d100 · Percentile</option><option value="custom">Custom faces</option></select></label><label class="custom-faces" hidden>Faces <input name="faces" type="number" min="2" max="1000" value="6"></label><label>How many <input name="count" type="number" min="1" max="20" value="1"></label><button class="primary" data-roll>Roll dice</button><button data-close>Hide dice</button><output aria-live="polite"></output>';
@@ -57,19 +80,10 @@ export function createDiceWidget(root,layer,activate){
   controls.querySelector('.custom-faces').hidden=type.value!=='custom';
   try{diceRoll(next,n,()=>0);}catch(e){output.textContent=e.message;return;}
   generation++;faces=next;solids=[];stage.replaceChildren();output.textContent='';
-  const model=dieGeometry(faces>=20?20:faces);
   for(let i=0;i<n;i++){
-   const object=document.createElement('div');object.className='floating-die-object';const columns=Math.max(1,Math.floor((layer.clientWidth-20)/112));object.style.left=(12+i%columns*112)+'px';object.style.top=(100+Math.floor(i/columns)*135)+'px';object.tabIndex=0;object.setAttribute('role','button');object.setAttribute('aria-label',`Die ${i+1}: d${faces}. Click to roll; drag to move.`);
-   const scene=document.createElement('div');scene.className='die-perspective';const solid=document.createElement('div');solid.className='die-solid';scene.append(solid);object.append(scene);
-   model.forEach((face,j)=>{
-    const surface=document.createElement('div');surface.className='die-surface';
-    const matrix=[...face.u,0,...face.v,0,...face.normal,0,...face.center,1];surface.style.transform=`matrix3d(${matrix.join(',')})`;
-    const number=faces===6?face.value:j%faces+1,id='die-finish-'+ ++dieSequence,hue=218+i*23;
-    surface.innerHTML=`<svg viewBox="-64 -64 128 128" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop stop-color="hsl(${hue} 65% 66%)"/><stop offset=".45" stop-color="hsl(${hue} 63% 45%)"/><stop offset="1" stop-color="hsl(${hue} 66% 27%)"/></linearGradient><radialGradient id="${id}-pip" cx="35%" cy="30%"><stop stop-color="#fff"/><stop offset=".7" stop-color="#ecf2fa"/><stop offset="1" stop-color="#a8b8cf"/></radialGradient></defs><path d="${roundedFacePath(face.points,faces===6?7:3)}" fill="url(#${id})" stroke="hsl(${hue} 48% 29%)" stroke-width="2" stroke-linejoin="round"/><path d="${roundedFacePath(face.points.map(p=>p.map(v=>v*.955)),faces===6?6:3)}" fill="none" stroke="#ffffff38" stroke-width="1"/>${faces===6?DIE_PIPS[number].map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="4.9" fill="#18335388"/><circle cx="${p[0]}" cy="${p[1]+.7}" r="3.9" fill="url(#${id}-pip)"/>`).join(''):`<text x="0" y="6" text-anchor="middle" fill="#f7fbff" font-size="20" font-family="system-ui" font-weight="700">${number}</text>`}</svg>`;
-    solid.append(surface);
-   });
-   solid.style.transform=restPose(model.find(face=>face.value===1)||model[0]);
-   const record={object,solid,model};solids.push(record);stage.append(object);
+   const record=createDieObject({faces,index:i}),{object,solid}=record;
+   const columns=Math.max(1,Math.floor((layer.clientWidth-20)/112));object.style.left=(12+i%columns*112)+'px';object.style.top=(100+Math.floor(i/columns)*135)+'px';object.tabIndex=0;object.setAttribute('role','button');object.setAttribute('aria-label',`Die ${i+1}: d${faces}. Click to roll; drag to move.`);
+   solids.push(record);stage.append(object);
    let dragged=false;
    object.onpointerdown=e=>{
     if(e.button!==0||busy)return;select();e.preventDefault();object.setPointerCapture(e.pointerId);dragged=false;
@@ -89,10 +103,7 @@ export function createDiceWidget(root,layer,activate){
   output.textContent='Rolling…';
   try{
    await Promise.all(solids.map(async(record,i)=>{
-    const index=faces===6?record.model.findIndex(face=>face.value===values[i]):(values[i]-1)%record.model.length;
-    // Custom/percentile dice use the faceted model with the exact rolled value on the landing face.
-    const text=record.solid.children[index].querySelector('text');if(text)text.textContent=values[i];
-    const previous=record.solid.style.transform,final=faceRotation(record.model[index].normal,record.model[index].u,record.model[index].v);record.solid.style.transform=final;
+    const previous=record.solid.style.transform,final=setDieResult(record,values[i]);record.solid.style.transform=final;
     const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
     const animation=playToolAnimation(record.solid,[
      {transform:previous},

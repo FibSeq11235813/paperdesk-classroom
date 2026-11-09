@@ -4,10 +4,11 @@ export function remainingMotion(motion,now=Date.now()){
  const elapsed=Math.max(0,now-motion.startedAt);
  return elapsed<motion.options.duration?{...motion,elapsed}:null;
 }
-export function playToolAnimation(element,frames,options){
- const motion={frames,options,startedAt:Date.now()};
+export function playToolAnimation(element,frames,options,{startedAt=Date.now(),now=Date.now()}={}){
+ const motion={frames,options,startedAt};
  element.dataset.toolMotion=JSON.stringify(motion);
  const animation=element.animate(frames,options);
+ animation.currentTime=Math.max(0,now-startedAt);
  animation.finished.finally(()=>{if(element.dataset.toolMotion===JSON.stringify(motion))delete element.dataset.toolMotion;}).catch(()=>{});
  return animation;
 }

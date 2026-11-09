@@ -1,3 +1,4 @@
+import {captureSharedObjects,createSharedObjectRenderer} from "./presentation-objects.mjs";
 import {remainingMotion} from "./tool-animation.mjs";
 const HTML_TAGS=new Set(['div','section','span','strong','small','p','output','i','img']);
 const SVG_TAGS=new Set(['svg','g','path','circle','ellipse','rect','polygon','line','text','textPath','defs','linearGradient','radialGradient','stop','mask']);
@@ -23,8 +24,8 @@ export function encodeToolElement(node){
 }
 export function capturePresentationTools(root,guide=null){
  const layer=root.querySelector('.floating-tool-layer');
- const children=layer?[...layer.children].filter(el=>!['menu','inspector'].includes(el.dataset.widget)).map(encodeToolElement).filter(Boolean):[];
- return {type:'tools',width:root.clientWidth,height:root.clientHeight,capturedAt:Date.now(),children,guide};
+ const children=layer?[...layer.children].filter(el=>!['menu','inspector'].includes(el.dataset.widget)&&!el.classList.contains('coin-object-stage')&&!el.classList.contains('dice-object-stage')).map(encodeToolElement).filter(Boolean):[];
+ return {type:'tools',width:root.clientWidth,height:root.clientHeight,capturedAt:Date.now(),children,objects:captureSharedObjects(root),guide};
 }
 export function watchPresentationTools(root,send,guide){
  let timer=null;const update=()=>{if(timer!==null)return;timer=setTimeout(()=>{timer=null;send(capturePresentationTools(root,guide()));},50);};
@@ -32,13 +33,20 @@ export function watchPresentationTools(root,send,guide){
  if(layer)new MutationObserver(update).observe(layer,{subtree:true,childList:true,attributes:true,characterData:true});
  for(const event of ['pointerdown','pointerup','mousedown','mouseup','input','change','animationstart','animationend','transitionrun','transitionend'])root.addEventListener(event,update,true);
  layer?.addEventListener('scroll',update,true);new ResizeObserver(update).observe(root);
+ // Refresh compact object state, including a late result, without rebuilding meshes.
+ const heartbeat=setInterval(()=>{if(layer&&[...layer.querySelectorAll('[data-shared-kind]')].some(el=>!el.closest('[hidden]')))update();},250);
+ window.addEventListener('pagehide',()=>clearInterval(heartbeat),{once:true});
  return update;
 }
 export function createPresentationTools(host,onGuide){
  host.classList.add('presentation-tool-mirror');let latest=null;
+ const scene=document.createElement('div');scene.className='tool-mirror-scene';
+ const objectScene=document.createElement('div');objectScene.className='tool-mirror-scene shared-objects-scene';host.append(scene,objectScene);
+ const objectRenderer=createSharedObjectRenderer(objectScene);
  function draw(data){
-  latest=data;const scene=document.createElement('div');scene.className='tool-mirror-scene';scene.style.width=data.width+'px';scene.style.height=data.height+'px';
+  latest=data;scene.style.width=data.width+'px';scene.style.height=data.height+'px';
   const scale=mirrorScale(data.width,data.height,host.clientWidth,host.clientHeight);scene.style.transform=`scale(${scale})`;scene.style.left=(host.clientWidth-data.width*scale)/2+'px';scene.style.top=(host.clientHeight-data.height*scale)/2+'px';
+  objectScene.style.cssText=scene.style.cssText;
   const scrolls=[],plays=[];let remaining=20000;
   const decode=tree=>{
    if(--remaining<0)return document.createTextNode('');
@@ -51,7 +59,7 @@ export function createPresentationTools(host,onGuide){
    if(tree.animations?.length){el.style.animation='none';el.style.transition='none';plays.push([el,tree.animations]);}
    if(tree.scroll)scrolls.push([el,tree.scroll]);return el;
   };
-  for(const child of data.children||[])scene.append(decode(child));host.replaceChildren(scene);
+  scene.replaceChildren(...(data.children||[]).map(decode));objectRenderer.update(data.objects||[]);
   for(const [el,scroll] of scrolls){el.scrollLeft=scroll[0];el.scrollTop=scroll[1];}
   for(const [el,animations] of plays)for(const a of animations){
    try{const animation=el.animate(a.frames,{duration:a.duration,delay:a.delay,easing:a.easing,iterations:a.iterations,fill:'none'});animation.currentTime=a.time+Math.max(0,Date.now()-data.capturedAt);}catch{/* Static object remains if an older browser cannot replay an animation. */}

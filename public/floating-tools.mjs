@@ -1,5 +1,5 @@
-import {createCoinWidget} from "./coin-3d.mjs?sync=2";
-import {createDiceWidget} from "./dice-3d.mjs?sync=2";
+import {createCoinWidget} from "./coin-3d.mjs?renderer=3";
+import {createDiceWidget} from "./dice-3d.mjs?renderer=3";
 import {iconButton} from "./ui-icons.mjs";
 import {TOOL_CATALOG,WIDGET_TOOLS,defaultToolPolicy} from './tool-policy.mjs';
 import {randomUnit,randomNumbers,wheelSectors,weightedPick} from './random-tools.mjs';
