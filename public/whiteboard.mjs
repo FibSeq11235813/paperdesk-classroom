@@ -1,3 +1,4 @@
+import {compassHandles,compassHit,arcStep,paintCompass} from "./compass-tool.mjs";
 import {objectBounds,hitObject,moveObject,insideBox,selectionBounds,selectionCorners,resizeFactor,scaleObject} from "./object-selection.mjs";
 import {bindTouchNavigation,touchView} from "./touch-navigation.mjs";
 import {icon,iconButton} from "./ui-icons.mjs";
@@ -56,7 +57,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
         <button class="board-timer-toggle">Timer</button>
         <button class="frame-toggle" aria-pressed="false" ${teacher?"":"hidden"}>Adjust clean-screen frame</button><button class="frame-standard" hidden>Standard slide view</button><button class="frame-reset" ${teacher?"":"hidden"}>Full page on clean screen</button>
       </div>
-      <div class="geometry-tools actions" hidden><span class="geometry-help"></span><label>Radius <input class="guide-radius" type="number" min="10" max="1000" value="100"></label><label class="rotation-label">Rotation ° <input class="guide-rotation" type="number" value="0"></label><label class="ray-label"><input class="guide-ray" type="checkbox">Draw ray</label><button class="guide-circle">Draw full circle</button><output class="guide-angle"></output></div>
+      <div class="geometry-tools actions" hidden><span class="geometry-help"></span><label>Radius <input class="guide-radius" type="number" min="10" max="1000" value="100"></label><label class="rotation-label">Rotation ° <input class="guide-rotation" type="number" value="0"></label><label class="ray-label"><input class="guide-ray" type="checkbox">Draw ray</label><span class="compass-controls actions"><button class="compass-lock" aria-pressed="false">Lock pin</button><button class="compass-place">Place pin</button><label>Tip <select class="compass-tip"><option value="pencil">Pencil</option><option value="marker">Marker</option><option value="highlighter">Highlighter</option></select></label></span><button class="guide-circle">Draw full circle</button><output class="guide-angle"></output></div>
     </div>
     <div class="board-timer actions" hidden><strong class="timer-readout">05:00</strong><select class="timer-mode" aria-label="Timer mode"><option>Countdown</option><option>Stopwatch</option></select><label class="timer-minutes-label">Minutes <input class="timer-minutes" type="number" min=".1" max="180" value="5"></label><button class="timer-start">Start</button><button class="timer-reset">Reset</button></div>
     <div class="native-viewport" tabindex="0" aria-label="Zoomable PDF workspace"><div class="native-clip"><div class="native-page">
@@ -87,6 +88,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     if(selection?.rangeCount&&root.contains(selection.anchorNode))selection.removeAllRanges();
   },true);
   let page=null,source=null,logicalHeight=700,originalHeight=700,marks=[],undo=[],redo=[],draft=null,gesture=null,guide=null;
+  let compassAngle=0,compassLocked=false;
   let selectedObjects=new Set();
   let zoom=1,scale=1,tool="pen",renderTask=null,generation=0,renderTimer,drawFrame,baseWidth=700,sceneVersion=0;
   let tile={x:0,y:0,width:1,height:1,dpr:1},renderedTile=null;
@@ -112,9 +114,9 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
   function geometry(){
     const active=["compass","protractor"].includes(tool);
     find(".geometry-tools").hidden=!active;
-    find(".geometry-help").textContent=tool==="compass"?"Place a center, then drag near the edge to sweep an arc.":"Place the center, rotate the baseline, and drag near an edge to measure.";
+    find(".geometry-help").textContent=tool==="compass"?"Place the pin. Drag Radius to set the opening, Rotate to aim without ink, or the colored tip to draw. Width sets the ink thickness.":"Place the center, rotate the baseline, and drag near an edge to measure.";
     find(".rotation-label").hidden=find(".ray-label").hidden=tool!=="protractor";
-    find(".guide-circle").hidden=tool!=="compass";
+    find(".guide-circle").hidden=find(".compass-controls").hidden=tool!=="compass";
   }
   const presets={pen:{color:"#174a87",width:.5,opacity:100},highlighter:{color:"#ffdd3e",width:.5,opacity:32},shape:{color:"#174a87",width:.5,opacity:100},eraser:{color:"#174a87",width:25,opacity:100}};
   for(const name of ["line","rect","ellipse","compass","protractor","pan","zoom","select"])presets[name]={...presets.shape};
@@ -278,7 +280,9 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     if(!guide||!["compass","protractor"].includes(tool))return;
     context.save();context.translate(guide.x,guide.y);context.strokeStyle="#176cc7";context.fillStyle="#176cc71f";context.lineWidth=1.2;
     const r=radius();context.beginPath();
-    if(tool==="compass"){context.setLineDash([4,4]);context.arc(0,0,r,0,Math.PI*2);context.stroke();}
+    if(tool==="compass"){
+      context.restore();paintCompass(context,guide,r,compassAngle,scale,{locked:compassLocked,color:find(".ink-color").value,tip:find(".compass-tip").selectedOptions[0].textContent});return;
+    }
     else {
       context.rotate(rotation());context.arc(0,0,r,Math.PI,Math.PI*2);context.closePath();context.fill();context.stroke();
       context.font="11px system-ui";context.textAlign="center";context.fillStyle="#174a87";
@@ -394,7 +398,16 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
       gesture.erase=true;erase(at);
     }else if(tool==="pan"){
       gesture.pan=true;gesture.client=[event.clientX,event.clientY];gesture.scroll=[viewport.scrollLeft,viewport.scrollTop];
-    }else if(["compass","protractor"].includes(tool)){
+    }else if(tool==="compass"){
+      if(!guide){guide={x:at.x,y:at.y};gesture=null;redraw();return false;}
+      const handle=compassHit(compassHandles(guide,radius(),compassAngle,scale),at,scale);
+      if(!handle||handle==="pin"&&compassLocked){gesture=null;redraw();return false;}
+      gesture.center={...guide};gesture.compassHandle=handle;gesture.compassRadius=radius();
+      gesture.startAngle=gesture.lastAngle=compassAngle;
+      gesture.grabAngle=direction(guide,at);gesture.lastAngle=gesture.grabAngle;gesture.originalAngle=compassAngle;
+      gesture.grabDistance=distance(guide,at);
+      gesture.compassInk=compassMark(gesture.center,compassAngle,0);
+    }else if(tool==="protractor"){
       if(!guide||distance(guide,at)>radius()+22){guide=at;gesture=null;redraw();return false;}
       gesture.center={...guide};gesture.move=distance(guide,at)<14;
       gesture.startAngle=gesture.lastAngle=direction(guide,at);
@@ -428,14 +441,21 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
       const width=Math.min(Math.max(10,Math.abs(at.x-active.start.x)),1000-active.start.x,(visibleHeight()-active.start.y)*pendingSnippet.ratio);
       draft.points[1]={x:active.start.x+width,y:active.start.y+width/pendingSnippet.ratio};redraw();onPreview();return;
     }
-    if(active.move){guide={x:active.center.x+at.x-active.start.x,y:active.center.y+at.y-active.start.y};}
-    else if(tool==="compass"){
+    if(active.compassHandle){
       const angle=direction(active.center,at);
-      active.sweep=clamp(active.sweep+Math.atan2(Math.sin(angle-active.lastAngle),Math.cos(angle-active.lastAngle)),-Math.PI*2,Math.PI*2);
-      active.lastAngle=angle;
-      draft={...baseMark("arc",[active.center]),radius:radius(),start:active.startAngle,sweep:active.sweep};
-      find(".guide-angle").textContent=(Math.abs(active.sweep)*180/Math.PI).toFixed(1)+"°";
-    }else if(tool==="protractor"){
+      if(active.compassHandle==="pin")guide={x:active.center.x+at.x-active.start.x,y:active.center.y+at.y-active.start.y};
+      else if(active.compassHandle==="radius")find(".guide-radius").value=clamp(active.compassRadius+((at.x-active.start.x)*Math.cos(active.originalAngle)+(at.y-active.start.y)*Math.sin(active.originalAngle))/.7,10,1000).toFixed(1);
+      else if(active.compassHandle==="rotate")compassAngle=active.originalAngle+arcStep(active.grabAngle,angle);
+      else{
+        active.sweep=clamp(active.sweep+arcStep(active.lastAngle,angle),-Math.PI*2,Math.PI*2);
+        active.lastAngle=angle;compassAngle=active.startAngle+active.sweep;
+        if(Math.abs(active.sweep)*active.compassRadius*scale>2)draft={...active.compassInk,sweep:active.sweep};
+        find(".guide-angle").textContent=(Math.abs(active.sweep)*180/Math.PI).toFixed(1)+"°";
+      }
+      redraw();onPreview();return;
+    }
+    if(active.move){guide={x:active.center.x+at.x-active.start.x,y:active.center.y+at.y-active.start.y};}
+    else if(tool==="protractor"){
       const angle=direction(active.center,at),degrees=(((rotation()-angle)*180/Math.PI)%360+360)%360;
       find(".guide-angle").textContent=degrees.toFixed(1)+"°";
       draft=baseMark("line",[active.center,at]);draft.guideOnly=!find(".guide-ray").checked;
@@ -613,7 +633,21 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
       find(action==="undo"?".ink-undo":".ink-redo").onclick();
     });
   }
-  find(".guide-circle").onclick=()=>{if(guide)edit([...marks,{...baseMark("arc",[guide]),radius:radius(),start:0,sweep:Math.PI*2}]);};
+  function compassMark(center,start,sweep){
+    const mark={...baseMark("arc",[{...center}]),radius:radius(),start,sweep};
+    if(find(".compass-tip").value==="highlighter")mark.opacity*=.32;
+    else if(find(".compass-tip").value==="pencil")mark.opacity*=.85;
+    return mark;
+  }
+  find(".compass-lock").onclick=()=>{
+    cancel();compassLocked=!compassLocked;
+    find(".compass-lock").textContent=compassLocked?"Unlock pin":"Lock pin";
+    find(".compass-lock").setAttribute("aria-pressed",String(compassLocked));redraw();
+  };
+  find(".compass-place").onclick=()=>{cancel();guide=null;redraw();status("Tap the page to place the compass pin.");};
+  find(".compass-tip").onchange=()=>{cancel();redraw();};
+  find(".ink-color").addEventListener("input",redraw);
+  find(".guide-circle").onclick=()=>{if(guide)edit([...marks,compassMark(guide,compassAngle,Math.PI*2)]);};
   find(".guide-radius").oninput=find(".guide-rotation").oninput=redraw;
   find(".board-in").onclick=()=>{layout(zoom*1.3,{x:viewport.clientWidth/2,y:viewport.clientHeight/2});changed();};
   find(".board-out").onclick=()=>{layout(zoom/1.3,{x:viewport.clientWidth/2,y:viewport.clientHeight/2});changed();};
