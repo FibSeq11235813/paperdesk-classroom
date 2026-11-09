@@ -350,6 +350,15 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
   window.addEventListener("pointermove",event=>{if(inputMode!=="mouse")trackEraser(event);},true);
   window.addEventListener("blur",()=>{eraserAt=null;positionEraser();});
   find(".ink-width").addEventListener("input",positionEraser);
+  const widthField=find(".ink-width");
+  widthField.addEventListener("wheel",event=>{
+    if(document.activeElement!==widthField||event.ctrlKey||event.metaKey||!event.deltaY)return;
+    event.preventDefault();event.stopPropagation();
+    const current=Number(widthField.value)||.5;
+    widthField.value=clamp(Math.round(current*10)+(event.deltaY<0?1:-1),1,600)/10;
+    widthField.dispatchEvent(new Event("input",{bubbles:true}));
+    widthField.dispatchEvent(new Event("change",{bubbles:true}));
+  },{passive:false});
   function erase(at){
     const active=gesture;
     const next=eraseSweep(marks,active.lastErase||at,at,Math.max(.05,Number(find(".ink-width").value)/2));
