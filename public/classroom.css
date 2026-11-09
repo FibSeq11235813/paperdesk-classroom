@@ -223,3 +223,17 @@ body.workspace-active[data-workspace=teacher]>main{top:0}
 .die-surface{position:absolute;left:-64px;top:-64px;width:128px;height:128px;transform-origin:64px 64px;backface-visibility:hidden;-webkit-backface-visibility:hidden;pointer-events:none}
 .die-surface svg{display:block;width:100%;height:100%;overflow:visible}
 @media(max-width:600px){.dice-toolbar,.widget-settings-toolbar{gap:5px;font-size:11px}.dice-toolbar select{max-width:140px}.widget-settings-toolbar>small{display:none}}
+
+/* Draggable 3D coins; all currency, denomination and size controls stay above. */
+.coin-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:3px 0;font-size:12px}
+.coin-toolbar label{display:inline-flex;align-items:center;gap:5px}.coin-toolbar input[type=range]{width:90px}.coin-toolbar output{font-weight:650;color:#775319;max-width:100%;overflow-wrap:anywhere}
+.coin-object-stage{position:absolute;inset:0;overflow:auto;pointer-events:none;scrollbar-width:thin}
+.floating-coin-object{position:absolute;pointer-events:auto;touch-action:none;cursor:grab;outline:none;filter:drop-shadow(0 14px 7px #3b2a172e);-webkit-user-select:none;user-select:none}
+.floating-coin-object:active{cursor:grabbing}.floating-coin-object:focus-visible{outline:2px solid #b38a35;outline-offset:5px;border-radius:50%}
+.coin-perspective{position:relative;width:100%;height:100%;perspective:700px;pointer-events:none}
+.coin-solid{position:relative;width:100%;height:100%;transform-style:preserve-3d;-webkit-transform-style:preserve-3d;will-change:transform}
+.coin-disc,.coin-thickness{position:absolute;inset:0;border-radius:50%;pointer-events:none}
+.coin-disc{backface-visibility:hidden;-webkit-backface-visibility:hidden}.coin-disc svg{width:100%;height:100%;display:block;overflow:visible}
+.coin-heads{transform:translateZ(4px)}.coin-tails{transform:rotateX(180deg) translateZ(4px)}
+.coin-thickness{box-shadow:inset 0 0 0 1px #59452b66}
+@media(max-width:600px){.coin-toolbar{gap:5px;font-size:11px}.coin-toolbar select{max-width:135px}.coin-toolbar input[type=range]{width:65px}}

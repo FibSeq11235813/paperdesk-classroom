@@ -20,12 +20,23 @@ export function dieGeometry(sides){
   if(distances.some(d=>d>1e-5)&&distances.some(d=>d< -1e-5))continue;
   if(dot(normal,vertices[a])<0)normal=normal.map(n=>-n);
   const ids=vertices.map((v,i)=>Math.abs(dot(normal,sub(v,vertices[a])))<1e-5?i:-1).filter(i=>i>=0),key=ids.join(',');if(found.has(key))continue;
-  const center=[0,1,2].map(axis=>ids.reduce((s,i)=>s+vertices[i][axis],0)/ids.length),u=unit(sub(vertices[ids[0]],center)),v=cross(normal,u);
+  const center=[0,1,2].map(axis=>ids.reduce((s,i)=>s+vertices[i][axis],0)/ids.length);
+  const neighbor=ids.slice(1).sort((a,b)=>Math.hypot(...sub(vertices[a],vertices[ids[0]]))-Math.hypot(...sub(vertices[b],vertices[ids[0]])))[0];
+  const u=unit(sub(vertices[neighbor],vertices[ids[0]])),v=cross(normal,u);
   const points=ids.map(i=>{const p=sub(vertices[i],center);return [dot(p,u),dot(p,v)];}).sort((a,b)=>Math.atan2(a[1],a[0])-Math.atan2(b[1],b[0]));
-  found.set(key,{normal,center,u,v,points});
+  const value=sides===6?(normal[2]>.9?1:normal[2]<-.9?6:normal[1]<-.9?2:normal[1]>.9?5:normal[0]>.9?3:4):found.size+1;
+  found.set(key,{normal,center,u,v,points,value});
  }
  return [...found.values()];
 }
+export function roundedFacePath(points,radius=5){
+ const toward=(a,b)=>{const d=Math.hypot(b[0]-a[0],b[1]-a[1]),t=Math.min(radius/d,.22);return [a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t];};
+ const parts=points.map((p,i)=>({p,before:toward(p,points[(i+points.length-1)%points.length]),after:toward(p,points[(i+1)%points.length])}));
+ return parts.map((c,i)=>`${i?'L':'M'}${c.before.join(',')} Q${c.p.join(',')} ${c.after.join(',')}`).join(' ')+' Z';
+}
+export const DIE_PIPS={1:[[0,0]],2:[[-15,-15],[15,15]],3:[[-15,-15],[0,0],[15,15]],4:[[-15,-15],[15,-15],[-15,15],[15,15]],5:[[-15,-15],[15,-15],[0,0],[-15,15],[15,15]],6:[[-15,-15],[15,-15],[-15,0],[15,0],[-15,15],[15,15]]};
+const restPose=face=>'rotateX(-12deg) rotateY(14deg) '+faceRotation(face.normal,face.u,face.v);
+let dieSequence=0;
 export function faceRotation(normal,u,v){
  if(u&&v)return `matrix3d(${[u[0],v[0],normal[0],0,u[1],v[1],normal[1],0,u[2],v[2],normal[2],0,0,0,0,1].join(',')})`;
  const angle=Math.acos(Math.max(-1,Math.min(1,normal[2])))*180/Math.PI;
@@ -52,12 +63,11 @@ export function createDiceWidget(root,layer,activate){
    model.forEach((face,j)=>{
     const surface=document.createElement('div');surface.className='die-surface';
     const matrix=[...face.u,0,...face.v,0,...face.normal,0,...face.center,1];surface.style.transform=`matrix3d(${matrix.join(',')})`;
-    const number=j%faces+1;
-    const pips={1:[[0,0]],2:[[-15,-15],[15,15]],3:[[-15,-15],[0,0],[15,15]],4:[[-15,-15],[15,-15],[-15,15],[15,15]],5:[[-15,-15],[15,-15],[0,0],[-15,15],[15,15]],6:[[-15,-15],[15,-15],[-15,0],[15,0],[-15,15],[15,15]]};
-    surface.innerHTML=`<svg viewBox="-64 -64 128 128" aria-hidden="true"><polygon points="${face.points.map(p=>p.join(',')).join(' ')}" fill="hsl(${218+i*23} 62% ${43+j%3*5}%)" stroke="#d7e7ff" stroke-width="1.5"/>${faces===6?pips[number].map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="white"/>`).join(''):`<text x="0" y="6" text-anchor="middle" fill="white" font-size="20" font-family="system-ui" font-weight="700">${number}</text>`}</svg>`;
+    const number=faces===6?face.value:j%faces+1,id='die-finish-'+ ++dieSequence,hue=218+i*23;
+    surface.innerHTML=`<svg viewBox="-64 -64 128 128" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop stop-color="hsl(${hue} 65% 66%)"/><stop offset=".45" stop-color="hsl(${hue} 63% 45%)"/><stop offset="1" stop-color="hsl(${hue} 66% 27%)"/></linearGradient><radialGradient id="${id}-pip" cx="35%" cy="30%"><stop stop-color="#fff"/><stop offset=".7" stop-color="#ecf2fa"/><stop offset="1" stop-color="#a8b8cf"/></radialGradient></defs><path d="${roundedFacePath(face.points,faces===6?7:3)}" fill="url(#${id})" stroke="hsl(${hue} 48% 29%)" stroke-width="2" stroke-linejoin="round"/><path d="${roundedFacePath(face.points.map(p=>p.map(v=>v*.955)),faces===6?6:3)}" fill="none" stroke="#ffffff38" stroke-width="1"/>${faces===6?DIE_PIPS[number].map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="4.9" fill="#18335388"/><circle cx="${p[0]}" cy="${p[1]+.7}" r="3.9" fill="url(#${id}-pip)"/>`).join(''):`<text x="0" y="6" text-anchor="middle" fill="#f7fbff" font-size="20" font-family="system-ui" font-weight="700">${number}</text>`}</svg>`;
     solid.append(surface);
    });
-   solid.style.transform='rotateX(-22deg) rotateY(28deg)';
+   solid.style.transform=restPose(model.find(face=>face.value===1)||model[0]);
    const record={object,solid,model};solids.push(record);stage.append(object);
    let dragged=false;
    object.onpointerdown=e=>{
@@ -78,10 +88,10 @@ export function createDiceWidget(root,layer,activate){
   output.textContent='Rolling…';
   try{
    await Promise.all(solids.map(async(record,i)=>{
-    const index=(values[i]-1)%record.model.length,normal=record.model[index].normal;
+    const index=faces===6?record.model.findIndex(face=>face.value===values[i]):(values[i]-1)%record.model.length;
     // Custom/percentile dice use the faceted model with the exact rolled value on the landing face.
     const text=record.solid.children[index].querySelector('text');if(text)text.textContent=values[i];
-    const previous=record.solid.style.transform,final=faceRotation(normal,record.model[index].u,record.model[index].v);record.solid.style.transform=final;
+    const previous=record.solid.style.transform,final=restPose(record.model[index]);record.solid.style.transform=final;
     const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
     const animation=record.solid.animate([
      {transform:previous},

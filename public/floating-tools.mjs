@@ -1,3 +1,4 @@
+import {createCoinWidget} from "./coin-3d.mjs";
 import {createDiceWidget} from "./dice-3d.mjs";
 import {iconButton} from "./ui-icons.mjs";
 import {TOOL_CATALOG,WIDGET_TOOLS,defaultToolPolicy} from './tool-policy.mjs';
@@ -8,8 +9,10 @@ export function createFloatingTools(root,{onWidgetSelected=()=>{}}={}){
  const layer=document.createElement('div');layer.className='floating-tool-layer';root.append(layer);
  const launch=document.createElement('button');launch.className='widget-launch';launch.textContent='✦ Classroom tools';root.querySelector('.board-footer').append(launch);
  let policy=defaultToolPolicy(),serial=0,activeWidget=null;const windows=new Map(),bars=new Map();
- function activateWidget(key){activeWidget=key;onWidgetSelected();for(const [id,bar] of bars)bar.hidden=id!==key;dice.hideControls();}
+ function activateWidget(key){activeWidget=key;onWidgetSelected();for(const [id,bar] of bars)bar.hidden=id!==key;dice.hideControls();coins.hideControls();}
  const dice=createDiceWidget(root,layer,()=>activateWidget('dice'));
+ const coins=createCoinWidget(root,layer,()=>activateWidget('coin'));
+ const coinButton=document.createElement('button');coinButton.textContent='Coins';iconButton(coinButton,'coin','Coins');root.querySelector('.tool-rail').append(coinButton);coinButton.onclick=()=>open('coin');
  const diceButton=document.createElement('button');diceButton.textContent='Dice';iconButton(diceButton,'dice','Dice');root.querySelector('.tool-rail').append(diceButton);diceButton.onclick=()=>open('dice');
  function panel(key,title){
   const box=document.createElement('section');box.className='floating-tool';box.dataset.widget=key;box.style.left=(12+serial%4*22)+'px';box.style.top=(12+serial++%4*22)+'px';box.style.zIndex=String(10+serial);
@@ -27,13 +30,14 @@ export function createFloatingTools(root,{onWidgetSelected=()=>{}}={}){
   const record={box,body,heading};windows.set(key,record);return record;
  }
  const menu=panel('menu','Classroom tools');menu.box.hidden=true;
- for(const key of WIDGET_TOOLS){const b=document.createElement('button');b.textContent=TOOL_CATALOG[key];b.dataset.tool=key;if(key==='dice')iconButton(b,'dice','Dice');b.onclick=()=>open(key);menu.body.append(b);}
+ for(const key of WIDGET_TOOLS){const b=document.createElement('button');b.textContent=TOOL_CATALOG[key];b.dataset.tool=key;if(key==='dice')iconButton(b,'dice','Dice');if(key==='coin')iconButton(b,'coin','Coins');b.onclick=()=>open(key);menu.body.append(b);}
  launch.onclick=()=>{menu.box.hidden=!menu.box.hidden;};
  
  function open(key){
   if(!policy[key])return;
   menu.box.hidden=true;
   if(key==='dice'){dice.open();return;}
+  if(key==='coin'){coins.open();return;}
   activateWidget(key);
   if(windows.has(key)){windows.get(key).box.hidden=false;return;}
   const bar=document.createElement('div');bar.className='widget-settings-toolbar actions';bars.set(key,bar);root.querySelector('.board-tools').append(bar);
@@ -79,7 +83,7 @@ export function createFloatingTools(root,{onWidgetSelected=()=>{}}={}){
   };
   for(const child of [...body.children])if(child.matches('label,button,small,.widget-error'))bar.append(child);
  }
- return {activateDrawing:()=>{activeWidget=null;dice.hideControls();for(const bar of bars.values())bar.hidden=true;},
-  setPolicy:next=>{policy={...defaultToolPolicy(),...next};dice.setEnabled(policy.dice);diceButton.hidden=!policy.dice;for(const key of WIDGET_TOOLS){menu.body.querySelector(`[data-tool="${key}"]`).hidden=!policy[key];if(!policy[key]&&windows.has(key))windows.get(key).box.hidden=true;if(!policy[key]&&bars.has(key))bars.get(key).hidden=true;}launch.hidden=WIDGET_TOOLS.every(key=>!policy[key]);},
-  hideInspector:()=>{dice.hideControls();for(const bar of bars.values())bar.hidden=true;},open};
+ return {activateDrawing:()=>{activeWidget=null;dice.hideControls();coins.hideControls();for(const bar of bars.values())bar.hidden=true;},
+  setPolicy:next=>{policy={...defaultToolPolicy(),...next};dice.setEnabled(policy.dice);diceButton.hidden=!policy.dice;coins.setEnabled(policy.coin);coinButton.hidden=!policy.coin;for(const key of WIDGET_TOOLS){menu.body.querySelector(`[data-tool="${key}"]`).hidden=!policy[key];if(!policy[key]&&windows.has(key))windows.get(key).box.hidden=true;if(!policy[key]&&bars.has(key))bars.get(key).hidden=true;}launch.hidden=WIDGET_TOOLS.every(key=>!policy[key]);},
+  hideInspector:()=>{dice.hideControls();coins.hideControls();for(const bar of bars.values())bar.hidden=true;},open};
 }
