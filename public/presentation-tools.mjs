@@ -1,20 +1,29 @@
-const HTML_TAGS=new Set(['div','section','span','strong','small','p','output','i']);
+import {remainingMotion} from "./tool-animation.mjs";
+const HTML_TAGS=new Set(['div','section','span','strong','small','p','output','i','img']);
 const SVG_TAGS=new Set(['svg','g','path','circle','ellipse','rect','polygon','line','text','textPath','defs','linearGradient','radialGradient','stop','mask']);
 const ATTRS=new Set(['class','style','viewBox','d','cx','cy','r','rx','ry','x','y','x1','x2','y1','y2','width','height','fill','stroke','stroke-width','stroke-linecap','stroke-linejoin','stroke-dasharray','points','transform','id','offset','stop-color','stop-opacity','opacity','mask','font-family','font-size','font-weight','letter-spacing','text-anchor','startOffset','color']);
-export function safeMirrorAttribute(name,value){return ATTRS.has(name)||name==='href'&&value.startsWith('#');}
+export function safeMirrorAttribute(name,value){
+ if(name==='src')return /^\/coins\/[a-z0-9-]+\.webp$/.test(value);
+ return ATTRS.has(name)||['alt','aria-label','data-result'].includes(name)||name==='href'&&value.startsWith('#');
+}
 export function mirrorScale(sourceWidth,sourceHeight,width,height){return Math.min(width/Math.max(1,sourceWidth),height/Math.max(1,sourceHeight));}
-function encode(node){
+export function encodeToolElement(node){
  if(node.nodeType===3)return {text:node.textContent};
  if(node.nodeType!==1||node.hidden||(!HTML_TAGS.has(node.localName)&&!SVG_TAGS.has(node.localName)))return null;
  const attrs={};for(const a of node.attributes)if(safeMirrorAttribute(a.name,a.value))attrs[a.name]=a.value;
- const animations=(node.getAnimations?.()||[]).filter(a=>a.playState==='running'&&a.effect?.target===node).map(a=>{
+ let animations=(node.getAnimations?.()||[]).filter(a=>a.playState==='running'&&a.effect?.target===node).map(a=>{
   const t=a.effect.getTiming();return {frames:a.effect.getKeyframes().map(f=>Object.fromEntries(Object.entries(f).filter(([key])=>['transform','opacity','offset','easing'].includes(key)))),duration:Number(t.duration)||0,delay:t.delay||0,easing:t.easing,iterations:Number.isFinite(t.iterations)?t.iterations:1,time:Number(a.currentTime)||0};
  })||[];
- return {tag:node.localName,svg:node.namespaceURI==='http://www.w3.org/2000/svg',attrs,scroll:[node.scrollLeft,node.scrollTop],animations,children:[...node.childNodes].map(encode).filter(Boolean)};
+ if(node.dataset?.toolMotion){
+  try{const motion=remainingMotion(JSON.parse(node.dataset.toolMotion));
+   animations=motion?[{frames:motion.frames,duration:motion.options.duration,delay:motion.options.delay||0,easing:motion.options.easing||'linear',iterations:1,time:motion.elapsed}]:[];
+  }catch{animations=[];}
+ }
+ return {tag:node.localName,svg:node.namespaceURI==='http://www.w3.org/2000/svg',attrs,scroll:[node.scrollLeft,node.scrollTop],animations,children:[...node.childNodes].map(encodeToolElement).filter(Boolean)};
 }
 export function capturePresentationTools(root,guide=null){
  const layer=root.querySelector('.floating-tool-layer');
- const children=layer?[...layer.children].filter(el=>!['menu','inspector'].includes(el.dataset.widget)).map(encode).filter(Boolean):[];
+ const children=layer?[...layer.children].filter(el=>!['menu','inspector'].includes(el.dataset.widget)).map(encodeToolElement).filter(Boolean):[];
  return {type:'tools',width:root.clientWidth,height:root.clientHeight,capturedAt:Date.now(),children,guide};
 }
 export function watchPresentationTools(root,send,guide){

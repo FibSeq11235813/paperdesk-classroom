@@ -1,8 +1,8 @@
-import {createCoinWidget} from "./coin-3d.mjs";
-import {createDiceWidget} from "./dice-3d.mjs";
+import {createCoinWidget} from "./coin-3d.mjs?sync=2";
+import {createDiceWidget} from "./dice-3d.mjs?sync=2";
 import {iconButton} from "./ui-icons.mjs";
 import {TOOL_CATALOG,WIDGET_TOOLS,defaultToolPolicy} from './tool-policy.mjs';
-import {randomUnit,diceRoll,randomNumbers,wheelSectors,weightedPick} from './random-tools.mjs';
+import {randomUnit,randomNumbers,wheelSectors,weightedPick} from './random-tools.mjs';
 const escape=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export function createFloatingTools(root,{onWidgetSelected=()=>{}}={}){
  root.classList.add('floating-tools-host');
@@ -42,9 +42,7 @@ export function createFloatingTools(root,{onWidgetSelected=()=>{}}={}){
   if(windows.has(key)){windows.get(key).box.hidden=false;return;}
   const bar=document.createElement('div');bar.className='widget-settings-toolbar actions';bars.set(key,bar);root.querySelector('.board-tools').append(bar);
   const widget=panel(key,TOOL_CATALOG[key]),body=widget.body;
-  const forms={coin:'<div class="coin-face widget-result">?</div><button data-run>Flip coin</button>',
-   dice:'<label>Faces <input name="faces" type="number" min="2" max="1000" value="6"></label><label>Dice <input name="count" type="number" min="1" max="20" value="2"></label><div class="dice-tray widget-result"></div><button data-run>Roll dice</button>',
-   random:'<label>Minimum <input name="min" type="number" value="1"></label><label>Maximum <input name="max" type="number" value="100"></label><label>How many <input name="count" type="number" min="1" max="100" value="1"></label><label>Type <select name="type"><option value="integer">Integers</option><option value="even">Even integers</option><option value="odd">Odd integers</option><option value="prime">Primes</option><option value="decimal">Decimals (2 places)</option></select></label><label><input name="unique" type="checkbox"> No repeats</label><div class="widget-result"></div><button data-run>Generate</button>',
+  const forms={random:'<label>Minimum <input name="min" type="number" value="1"></label><label>Maximum <input name="max" type="number" value="100"></label><label>How many <input name="count" type="number" min="1" max="100" value="1"></label><label>Type <select name="type"><option value="integer">Integers</option><option value="even">Even integers</option><option value="odd">Odd integers</option><option value="prime">Primes</option><option value="decimal">Decimals (2 places)</option></select></label><label><input name="unique" type="checkbox"> No repeats</label><div class="widget-result"></div><button data-run>Generate</button>',
    spinner:'<label>Sectors <input name="count" type="number" min="2" max="40" value="6"></label><label><input name="weighted" type="checkbox"> Custom weights</label><label>Labels (optional, one per line)<textarea name="labels" placeholder="Red:2&#10;Blue:1&#10;Green:1"></textarea></label><small>Blank labels use numbered sectors. With custom weights, Label:2 is twice as likely as Label:1.</small><div class="wheel-wrap"><div class="spinner-wheel"></div><span class="wheel-pointer">▼</span></div><div class="wheel-key"></div><div class="widget-result"></div><button data-preview>Update wheel</button><button data-run>Spin</button>',
    names:'<label>Names or prompts (one per line)<textarea name="names" placeholder="Alex&#10;Sam&#10;Jordan"></textarea></label><label><input name="remove" type="checkbox"> Remove after picking</label><div class="widget-result"></div><button data-run>Pick one</button>',
    counter:'<div class="widget-result">0</div><button data-minus>−</button><button data-run>+1</button><button data-reset>Reset</button>'};
@@ -63,11 +61,6 @@ export function createFloatingTools(root,{onWidgetSelected=()=>{}}={}){
   run.onclick=()=>{
    error.textContent='';try{
     result.classList.remove('widget-animate');void result.offsetWidth;
-    if(key==='coin'){result.textContent=randomUnit()<.5?'Heads':'Tails';result.classList.add('widget-animate');}
-    if(key==='dice'){
-     const faces=+value('faces').value,rolls=diceRoll(faces,+value('count').value);
-     result.innerHTML=rolls.map(n=>`<span class="class-die ${faces===6?'cube-die':'poly-die'}" aria-label="${n} on a ${faces}-sided die">${faces===6?['⚀','⚁','⚂','⚃','⚄','⚅'][n-1]:n}<small>d${faces}</small></span>`).join('')+`<small class="dice-total">Total: ${rolls.reduce((a,b)=>a+b,0)}</small>`;result.classList.add('widget-animate');
-    }
     if(key==='random')result.textContent=randomNumbers({min:+value('min').value,max:+value('max').value,count:+value('count').value,type:value('type').value,unique:value('unique').checked}).join(', ');
     if(key==='names'){
      const names=value('names').value.split('\n').map(n=>n.trim()).filter(Boolean);if(!names.length)throw new Error('Enter at least one name or prompt.');

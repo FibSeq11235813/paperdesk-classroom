@@ -1,6 +1,6 @@
 import {createClassTimer} from "./class-timer.mjs";
-import {createPresentationTools} from "./presentation-tools.mjs";
-import {createWhiteboard,loadPDF} from "./whiteboard.mjs";
+import {createPresentationTools} from "./presentation-tools.mjs?sync=2";
+import {createWhiteboard,loadPDF} from "./whiteboard.mjs?sync=2";
 const board=createWhiteboard(document.getElementById("presentationBoard"),{readOnly:true});
 const toolHost=document.createElement("div");document.body.append(toolHost);const tools=createPresentationTools(toolHost,guide=>board.setToolOverlay(guide));
 const timerHost=document.createElement("div");timerHost.className="clean-class-timer";document.body.append(timerHost);const classTimer=createClassTimer(timerHost);

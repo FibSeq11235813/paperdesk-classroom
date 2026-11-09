@@ -1,3 +1,4 @@
+import {playToolAnimation} from "./tool-animation.mjs";
 import {diceRoll} from './random-tools.mjs';
 const dot=(a,b)=>a.reduce((s,v,i)=>s+v*b[i],0),sub=(a,b)=>a.map((v,i)=>v-b[i]);
 const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
@@ -93,14 +94,14 @@ export function createDiceWidget(root,layer,activate){
     const text=record.solid.children[index].querySelector('text');if(text)text.textContent=values[i];
     const previous=record.solid.style.transform,final=faceRotation(record.model[index].normal,record.model[index].u,record.model[index].v);record.solid.style.transform=final;
     const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const animation=record.solid.animate([
+    const animation=playToolAnimation(record.solid,[
      {transform:previous},
      {offset:.28,transform:`translate3d(${i%2?24:-24}px,-65px,15px) rotateX(420deg) rotateY(560deg) rotateZ(120deg)`},
      {offset:.66,transform:'translate3d(10px,-24px,0) rotateX(780deg) rotateY(1000deg) rotateZ(260deg)'},
      {offset:.84,transform:`translateY(-12px) ${final}`},
      {transform:final}
     ],{duration:reduced?0:1450+i*75,easing:'cubic-bezier(.25,.65,.35,1)'});
-    await animation.finished;record.object.setAttribute('aria-label',`Die ${i+1}: ${values[i]} on d${faces}. Click to roll; drag to move.`);
+    await animation.finished;record.object.dataset.result=String(values[i]);record.object.setAttribute('aria-label',`Die ${i+1}: ${values[i]} on d${faces}. Click to roll; drag to move.`);
    }));
    if(version===generation)output.textContent=values.join(' + ')+(values.length>1?' = '+values.reduce((a,b)=>a+b,0):'');
   }finally{busy=false;for(const c of controls.querySelectorAll('input,select,button'))c.disabled=false;}
