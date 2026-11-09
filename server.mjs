@@ -1,3 +1,4 @@
+import {defaultToolPolicy,normalizeToolPolicy} from "./public/tool-policy.mjs";
 import {defaultClassTimer,updateClassTimer} from "./public/class-timer-state.mjs";
 import {createServer} from "node:http";
 import {randomBytes,randomInt,createHash,timingSafeEqual} from "node:crypto";
@@ -32,6 +33,7 @@ if(!db.prepare("PRAGMA table_info(slides)").all().some(column=>column.name==="gr
 if(!db.prepare("PRAGMA table_info(slides)").all().some(column=>column.name==="pdf"))db.exec("ALTER TABLE slides ADD COLUMN pdf BLOB");
 if(!db.prepare("PRAGMA table_info(submissions)").all().some(column=>column.name==="work"))db.exec("ALTER TABLE submissions ADD COLUMN work TEXT");
 if(!db.prepare("PRAGMA table_info(rooms)").all().some(column=>column.name==="timer"))db.exec("ALTER TABLE rooms ADD COLUMN timer TEXT");
+if(!db.prepare("PRAGMA table_info(rooms)").all().some(column=>column.name==="tools"))db.exec("ALTER TABLE rooms ADD COLUMN tools TEXT");
 const query=Object.fromEntries(Object.entries({
   room:"SELECT * FROM rooms WHERE code=?",
   create:"INSERT INTO rooms(code,title,teacher_hash) VALUES(?,?,?)",
@@ -110,12 +112,17 @@ async function api(req,res,path) {
   const room=query.room.get(code);
   if(!room) fail(404,"Class session was not found or has been ended.");
   const teacher=authorized(req,room);
-  if(!section && method==="GET") return send(res,200,{code,title:room.title,slides:query.slides.all(code).map(slide=>({...slide,graph:slide.graph?JSON.parse(slide.graph):null})),teacher,timer:room.timer?JSON.parse(room.timer):defaultClassTimer(),serverTime:Date.now()});
+  if(!section && method==="GET") return send(res,200,{code,title:room.title,slides:query.slides.all(code).map(slide=>({...slide,graph:slide.graph?JSON.parse(slide.graph):null})),teacher,tools:room.tools?JSON.parse(room.tools):defaultToolPolicy(),timer:room.timer?JSON.parse(room.timer):defaultClassTimer(),serverTime:Date.now()});
   if(!section && method==="PATCH") {
-    if(!teacher)fail(403,"Only the teacher can control the class timer.");
+    if(!teacher)fail(403,"Only the teacher can change class controls.");
     const body=await json(req,4096);
     const current=query.room.get(code);
     if(!current)fail(404,"Class session was not found.");
+    if(body?.tools!==undefined){
+      let tools;try{tools=normalizeToolPolicy(body.tools);}catch(error){fail(400,error.message);}
+      db.prepare("UPDATE rooms SET tools=? WHERE code=?").run(JSON.stringify(tools),code);
+      return send(res,200,{tools,serverTime:Date.now()});
+    }
     const now=Date.now();let timer;
     try{timer=updateClassTimer(current.timer?JSON.parse(current.timer):defaultClassTimer(),body?.timer||{},now);}catch(error){fail(400,error.message);}
     db.prepare("UPDATE rooms SET timer=? WHERE code=?").run(JSON.stringify(timer),code);

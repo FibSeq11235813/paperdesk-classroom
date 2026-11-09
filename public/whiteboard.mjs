@@ -1,3 +1,5 @@
+import {createFloatingTools} from "./floating-tools.mjs";
+import {TOOL_CATALOG,defaultToolPolicy} from "./tool-policy.mjs";
 import {snapGeometry} from "./geometry-snap.mjs";
 import {compassHandles,compassHit,arcStep,paintCompass} from "./compass-tool.mjs";
 import {objectBounds,hitObject,moveObject,insideBox,selectionBounds,selectionCorners,resizeFactor,scaleObject} from "./object-selection.mjs";
@@ -78,6 +80,11 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
   settingsRow.append(advanced);
   const footer=find(".board-tools").children[1];footer.classList.add("board-footer");footer.hidden=readOnly;
   boardStage.after(footer);
+  const floating=readOnly?null:createFloatingTools(root);
+  if(floating){
+    const help=document.createElement("p");help.className="floating-tool-help";floating.inspector.append(help,settingsRow,find(".geometry-tools"));
+  }
+  let allowedTools=defaultToolPolicy();
   const clipElement=find(".native-clip"),frameElement=find(".presentation-frame");
   const viewport=find(".native-viewport"),pageElement=find(".native-page"),pdfCanvas=find(".pdf-tile"),inkCanvas=find(".ink-tile"),ink=inkCanvas.getContext("2d");
   // Safari's long press must stay a drawing gesture, not a text selection.
@@ -128,6 +135,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
   for(const name of ["line","rect","ellipse","compass","protractor","pan","zoom","select","point"])presets[name]={...presets.shape};
   const presetKey=value=>value;
   function choose(next){
+    if(!allowedTools[next])return;
     finishWidthAdjustment();
     pendingSnippet=null;
     const oldKey=presetKey(tool),nextKey=presetKey(next);
@@ -139,6 +147,18 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
       const preset=presets[nextKey];find(".ink-color").value=preset.color;find(".ink-width").value=preset.width;find(".ink-opacity").value=preset.opacity;
     }
     geometry();positionEraser();redraw();
+    if(floating){
+      settingsRow.hidden=["pan","zoom","select"].includes(tool);
+      floating.inspector.querySelector(".floating-tool-help").textContent=({
+        select:"Tap to select; drag to move. Drag corner handles to resize. Delete removes the selection.",
+        pen:"Draw freehand. Click Width and scroll to adjust in tenths.",highlighter:"Draw translucent strokes; opacity is available in settings.",
+        eraser:"Erase part of a stroke using the circular brush.",point:"Tap to place a point. Geometry snapping can place it exactly on a line.",
+        line:"Drag to draw a line. Choose arrows and solid, dashed, or dotted strokes.",rect:"Drag opposite corners to draw a rectangle.",ellipse:"Drag a bounding box to draw an ellipse.",
+        compass:"Place the pin, set the radius with the tip, and drag the barrel to draw.",protractor:"Place the center and drag near the edge to measure angles.",
+        pan:"Drag the page to pan. Two fingers pan and pinch on touch screens.",zoom:"Drag a rectangle around the area to enlarge."
+      })[tool]||"";
+      floating.showInspector(TOOL_CATALOG[tool]+" settings");
+    }
   }
   for(const button of root.querySelectorAll("[data-ink-tool]"))button.onclick=()=>choose(button.dataset.inkTool);
   for(const color of ["#174a87","#161c25","#c52d42","#11714b","#8042ac","#ffdd3e","#f47c24","#ffffff"]){
@@ -379,7 +399,7 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     box.style.width=Math.abs(b.x-a.x)*scale+"px";box.style.height=Math.abs(b.y-a.y)*scale+"px";
   }
   function startPointer(event){
-    if((readOnly&&!selectionCallback)||!source)return false;
+    if((readOnly&&!selectionCallback)||!source||!readOnly&&!allowedTools[tool])return false;
     event.preventDefault();
     let at=point(event);if(!at)return false;
     snapIndicator=null;if(["line","point"].includes(tool))at=snapPoint(at);
@@ -772,6 +792,14 @@ export function createWhiteboard(root,{onChange=()=>{},onPreview=()=>{},onCropCh
     return output.toDataURL("image/png");
   }
   return {setSource,fit,
+    setToolPolicy:value=>{
+      allowedTools={...defaultToolPolicy(),...value};floating?.setPolicy(allowedTools);
+      for(const b of root.querySelectorAll("[data-ink-tool]"))b.hidden=!allowedTools[b.dataset.inkTool];
+      if(!allowedTools[tool]){
+        cancel();const fallback=["pen","pan","select","zoom"].find(key=>allowedTools[key]);
+        if(fallback)choose(fallback);else floating?.hideInspector();
+      }
+    },
     zoomBy:factor=>layout(zoom*factor,{x:viewport.clientWidth/2,y:viewport.clientHeight/2}),
     getScratch:()=>find(".board-scratch").checked,
     cancelSelection:()=>{selectionCallback=null;cancel();},

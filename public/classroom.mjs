@@ -1,8 +1,11 @@
+import {TOOL_CATALOG,defaultToolPolicy} from "./tool-policy.mjs";
+import {savedPageCount,clearPDFAnnotations,choosePDFMemory} from "./pdf-memory.mjs";
 import {createClassTimer} from "./class-timer.mjs";
 import {icon,iconButton} from "./ui-icons.mjs";
 import {frameForPage,standardSlideFrame} from "./presentation-frame.mjs";
 import {createGraph} from "./graph.mjs";
 import {createWhiteboard,loadPDF,bytesToBase64} from "./whiteboard.mjs";
+let sessionTools=defaultToolPolicy();
 const $=id=>document.getElementById(id);
 const state={room:null,role:null,token:null,name:"",pdf:null,page:1,render:0,
   current:null,slides:[],boardVersion:0,sessionVersion:0};
@@ -20,12 +23,12 @@ const studentGraph=createGraph($("studentGraph"),{onChange:value=>{
 }});
 let studentView="Slide";
 function setView(role,view){
-  const graph=view==="Graph";
+  const graph=view==="Graph"&&(role!=="student"||sessionTools.graph);
   $(role+"GraphPanel").hidden=!graph;
   $(role+"SlidePanel").hidden=graph;
   $(role+"GraphTab").setAttribute("aria-pressed",String(graph));
   $(role+"SlideTab").setAttribute("aria-pressed",String(!graph));
-  if(role==="student"){studentView=view;if(!graph)requestAnimationFrame(()=>studentBoard.fitDefaultView());}
+  if(role==="student"){studentView=graph?"Graph":"Slide";if(!graph)requestAnimationFrame(()=>studentBoard.fitDefaultView());}
 
 }
 for(const role of ["teacher","student"]){
@@ -133,7 +136,7 @@ async function teach(room) {
   $("teacherTitle").textContent=data.title;
   $("roomCode").textContent=room.code;
   $("joinLink").value=joinAddress(room.code);
-  teacherTimer.reset();teacherTimer.sync(data.timer,data._serverNow);
+  teacherTimer.reset();teacherTimer.sync(data.timer,data._serverNow);applyClassTools(data.tools);
   show("teacher");
   void refresh();
 }
@@ -167,6 +170,43 @@ const studentBoard=createWhiteboard($("studentBoard"),{classTimer:true,onChange:
   store.set(workKey()+".view",view);
   workStatus(saved?"Saved on this browser.":"Browser storage is unavailable. Keep this page open to preserve your work.");
 }});
+const clearPDFButton=document.createElement("button");clearPDFButton.textContent="Clear this PDF’s annotations";
+clearPDFButton.title="Clear saved teacher annotations on every page of the open PDF";
+$("example").after(clearPDFButton);
+clearPDFButton.onclick=async()=>{
+  if(!state.pdf||!fileKey){notice("Open a PDF first.");return;}
+  if(!confirm("Clear all teacher annotations on every page of this PDF? This also removes the browser’s saved annotations for this PDF. Your clean-screen frame stays."))return;
+  currentTeacherKey=null;teacherBoard.cancelSelection();clearPDFAnnotations(fileKey);await renderPage();
+};
+const permissionsPanel=document.createElement("section");permissionsPanel.className="panel";
+permissionsPanel.innerHTML='<h2>Student tools</h2><p>Changes apply to everyone in this session. Existing drawings remain visible.</p><div class="tool-master-actions"><button data-mode="all">Enable all</button><button data-mode="drawing">Drawing only</button><button data-mode="none">Disable all</button></div><div class="tool-permissions"></div><p class="tool-policy-status" role="status"></p>';
+$("classPanel").prepend(permissionsPanel);
+const policyStatus=permissionsPanel.querySelector(".tool-policy-status"),policyInputs=new Map();let savingPolicy=false;
+for(const [key,title] of Object.entries(TOOL_CATALOG)){
+  const label=document.createElement("label"),input=document.createElement("input");input.type="checkbox";input.checked=true;
+  label.append(input,document.createTextNode(title));permissionsPanel.querySelector(".tool-permissions").append(label);policyInputs.set(key,input);
+  input.onchange=()=>saveClassTools({...sessionTools,[key]:input.checked});
+}
+for(const b of permissionsPanel.querySelectorAll("[data-mode]"))b.onclick=()=>{
+ const tools=Object.fromEntries(Object.keys(TOOL_CATALOG).map(key=>[key,b.dataset.mode==="all"||b.dataset.mode==="drawing"&&!["coin","dice","random","spinner","names","counter","graph"].includes(key)]));
+ void saveClassTools(tools);
+};
+function applyClassTools(tools){
+ const next={...defaultToolPolicy(),...tools};sessionTools=next;
+ if(!savingPolicy)for(const [key,input] of policyInputs)input.checked=next[key];
+ if(state.role==="student"){
+  studentBoard.setToolPolicy(next);$("studentGraphTab").hidden=!next.graph;
+  if(!next.graph&&studentView==="Graph")setView("student","Slide");
+ }
+}
+async function saveClassTools(tools){
+ if(!state.room||state.role!=="teacher"||savingPolicy)return;
+ savingPolicy=true;policyStatus.textContent="Updating…";
+ for(const control of permissionsPanel.querySelectorAll("button,input"))control.disabled=true;
+ try{const result=await api(roomPath(),{method:"PATCH",token:state.token,body:{tools}});sessionTools=result.tools;policyStatus.textContent="Student tools updated.";}
+ catch(error){policyStatus.textContent=error.message;}
+ finally{savingPolicy=false;applyClassTools(sessionTools);for(const control of permissionsPanel.querySelectorAll("button,input"))control.disabled=false;}
+}
 function scheduleInkPresentation(){
   if(inkPresentationTimer!==undefined)return;
   inkPresentationTimer=setTimeout(()=>{
@@ -213,6 +253,13 @@ async function openPDF(file) {
     const key=Array.from(new Uint8Array(hash),byte=>byte.toString(16).padStart(2,"0")).join("");
     const pdf=await loadPDF(bytes);
     if(version!==state.render){await pdf.destroy();return;}
+    const count=savedPageCount(key);
+    if(count){
+      const choice=await choosePDFMemory(count);
+      if(version!==state.render){await pdf.destroy();return;}
+      if(choice==="cancel"){await pdf.destroy();if(state.pdf)await renderPage();else $("sourcePage").textContent="No PDF open";return;}
+      if(choice==="fresh"){currentTeacherKey=null;clearPDFAnnotations(key);}
+    }
     const previous=state.pdf;
     state.pdf=pdf;state.page=1;pdfBytes=bytes;fileKey=key;
     await renderPage();
@@ -315,7 +362,7 @@ async function join(code,name){
   store.set("paperdesk.classroom.name",name);
   store.set("paperdesk.classroom.joined."+code,name);
   $("studentTitle").textContent=data.title;
-  studentTimer.reset();
+  studentTimer.reset();applyClassTools(data.tools);
   show("student");
   await updateStudent(data.slides);
 }
@@ -333,6 +380,7 @@ async function refresh(){
     const data=await api(roomPath(),{token:state.token});
     if(version!==state.sessionVersion)return;
     (state.role==="student"?studentTimer:teacherTimer).sync(data.timer,data._serverNow);
+    applyClassTools(data.tools);
     if(state.role==="student"){
       await updateStudent(data.slides);
     } else {

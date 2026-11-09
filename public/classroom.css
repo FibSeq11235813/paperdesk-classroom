@@ -182,3 +182,29 @@ body.workspace-active[data-workspace=teacher]>main{top:0}
 .whiteboard-workspace [contenteditable="true"]{
   -webkit-user-select:text;user-select:text;-webkit-touch-callout:default;
 }
+
+/* Tool widgets live above the page and stay out of exported annotations. */
+.floating-tools-host{position:relative}
+.floating-tool-layer{position:absolute;inset:0;pointer-events:none;z-index:15;overflow:hidden}
+.floating-tool{position:absolute;width:min(330px,calc(100% - 12px));max-height:calc(100% - 20px);pointer-events:auto;background:#ffffffed;backdrop-filter:blur(12px);border:1px solid #b6c8d8;border-radius:14px;box-shadow:0 10px 36px #132f4c33;overflow:auto;color:#20374c}
+.floating-tool-handle{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#24384e;color:white;cursor:move;touch-action:none;z-index:1}
+.floating-tool-handle button{padding:0;width:28px;min-width:28px;height:28px;border:0;background:transparent;color:white;font-size:23px}
+.floating-tool-body{padding:12px;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.floating-tool-body>label{display:flex;flex-direction:column;gap:4px;flex:1 1 110px;font-size:12px}
+.floating-tool-body>label:has(input[type=checkbox]){flex-direction:row;align-items:center;flex-basis:100%}
+.floating-tool input[type=number],.floating-tool select{width:100%;max-width:100%;box-sizing:border-box}
+.floating-tool textarea{width:100%;min-height:75px;box-sizing:border-box;font:inherit;resize:vertical}
+.floating-tool .actions{flex-wrap:wrap;gap:8px}.floating-tool .geometry-tools{margin:0;padding:0;border:0}
+.floating-tool .ink-swatches{display:flex;flex-wrap:wrap;gap:5px}.floating-tool .advanced-ink-content{position:static;box-shadow:none}
+.widget-result{width:100%;font-size:24px;text-align:center;font-weight:700;overflow-wrap:anywhere;padding:8px 0}
+.widget-error{font-size:12px;color:#b22e42;margin:0;flex-basis:100%}
+.coin-face{width:90px;height:90px;margin:auto;border-radius:50%;display:grid;place-items:center;background:radial-gradient(circle at 30% 25%,#fff3ae,#e9b844 65%,#ab741b);box-shadow:inset 0 0 0 5px #f7d776,inset 0 0 0 7px #b2832e,0 5px 0 #a67624;color:#6c4818;font-size:20px}
+.dice-tray{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}.class-die{display:inline-grid;place-items:center;min-width:50px;min-height:58px;border-radius:10px;box-shadow:inset 0 0 0 1px #ffffff99,3px 5px 0 #273f68;background:linear-gradient(145deg,#6c86da,#344e92);color:white;font-size:32px;padding:4px}
+.class-die small{font-size:10px}.poly-die{clip-path:polygon(50% 0,100% 25%,92% 82%,50% 100%,8% 82%,0 25%);font-size:22px;padding:10px}.dice-total{width:100%;font-size:14px}
+.wheel-wrap{position:relative;width:190px;height:190px;margin:10px auto}.spinner-wheel{width:100%;height:100%;border-radius:50%;box-shadow:0 0 0 6px #e5eaf2,0 4px 15px #18395c33;transition:transform 2.3s cubic-bezier(.1,.65,.15,1)}.wheel-pointer{position:absolute;top:-14px;left:calc(50% - 10px);color:#233b54;font-size:27px}.wheel-key{display:flex;flex-wrap:wrap;gap:6px;font-size:11px}.wheel-key i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:3px}
+.widget-animate{animation:widget-tumble .5s ease-out}@keyframes widget-tumble{0%{transform:rotate(-8deg) scale(.75);opacity:.4}60%{transform:rotate(5deg) scale(1.06)}100%{transform:none;opacity:1}}
+.tool-permissions{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px}.tool-permissions label{display:flex;align-items:center;gap:5px}.tool-master-actions{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.pdf-memory-dialog{max-width:420px;border:1px solid #aabed0;border-radius:16px;padding:24px}.pdf-memory-dialog::backdrop{background:#172c4666}.pdf-memory-dialog .actions{display:flex;gap:10px;flex-wrap:wrap}
+@media(prefers-reduced-motion:reduce){.widget-animate{animation:none}.spinner-wheel{transition:none}}
+
+.floating-tool-help{font-size:12px;line-height:1.5;margin:0 0 4px;color:#4c6379;width:100%}.floating-tool-body input,.floating-tool-body textarea{-webkit-user-select:text;user-select:text;-webkit-touch-callout:default}
