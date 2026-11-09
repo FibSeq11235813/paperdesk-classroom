@@ -46,7 +46,7 @@ const query=Object.fromEntries(Object.entries({
   submission:"SELECT image,slide,work FROM submissions WHERE room=? AND id=?"
 }).map(([name,sql])=>[name,db.prepare(sql)]));
 
-const types={".html":"text/html; charset=utf-8",".css":"text/css; charset=utf-8",
+const types={".webp":"image/webp",".png":"image/png",".jpg":"image/jpeg",".html":"text/html; charset=utf-8",".css":"text/css; charset=utf-8",
   ".js":"text/javascript; charset=utf-8",".mjs":"text/javascript; charset=utf-8",
   ".wasm":"application/wasm",".pdf":"application/pdf"};
 const hash=token=>createHash("sha256").update(token).digest("hex");

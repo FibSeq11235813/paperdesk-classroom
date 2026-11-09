@@ -91,7 +91,7 @@ export function createDiceWidget(root,layer,activate){
     const index=faces===6?record.model.findIndex(face=>face.value===values[i]):(values[i]-1)%record.model.length;
     // Custom/percentile dice use the faceted model with the exact rolled value on the landing face.
     const text=record.solid.children[index].querySelector('text');if(text)text.textContent=values[i];
-    const previous=record.solid.style.transform,final=restPose(record.model[index]);record.solid.style.transform=final;
+    const previous=record.solid.style.transform,final=faceRotation(record.model[index].normal,record.model[index].u,record.model[index].v);record.solid.style.transform=final;
     const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
     const animation=record.solid.animate([
      {transform:previous},
