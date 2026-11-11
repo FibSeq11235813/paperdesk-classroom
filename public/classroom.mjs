@@ -1,5 +1,5 @@
 import {capturePresentationTools,watchPresentationTools} from "./presentation-tools.mjs?sync=3";
-import {TOOL_CATALOG,defaultToolPolicy} from "./tool-policy.mjs";
+import {TOOL_CATALOG,WIDGET_TOOLS,defaultToolPolicy} from "./tool-policy.mjs";
 import {savedPageCount,clearPDFAnnotations,choosePDFMemory} from "./pdf-memory.mjs";
 import {createClassTimer} from "./class-timer.mjs";
 import {icon,iconButton} from "./ui-icons.mjs";
@@ -193,7 +193,7 @@ for(const [key,title] of Object.entries(TOOL_CATALOG)){
   input.onchange=()=>saveClassTools({...sessionTools,[key]:input.checked});
 }
 for(const b of permissionsPanel.querySelectorAll("[data-mode]"))b.onclick=()=>{
- const tools=Object.fromEntries(Object.keys(TOOL_CATALOG).map(key=>[key,b.dataset.mode==="all"||b.dataset.mode==="drawing"&&!["coin","dice","random","spinner","names","counter","graph"].includes(key)]));
+ const tools=Object.fromEntries(Object.keys(TOOL_CATALOG).map(key=>[key,b.dataset.mode==="all"||b.dataset.mode==="drawing"&&key!=="graph"&&!WIDGET_TOOLS.includes(key)]));
  void saveClassTools(tools);
 };
 function applyClassTools(tools){

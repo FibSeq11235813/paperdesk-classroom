@@ -245,3 +245,10 @@ body.workspace-active[data-workspace=teacher]>main{top:0}
 .clean-class-timer{position:fixed;top:12px;right:12px;z-index:20;pointer-events:none;box-shadow:0 4px 16px #122c4433}
 
 .shared-objects-scene,.shared-objects-scene .die-perspective,.shared-objects-scene .coin-perspective{transform-style:preserve-3d;-webkit-transform-style:preserve-3d}
+
+.tree-diagram-panel{width:min(790px,calc(100% - 12px));background:#f5f8fc}
+.tree-diagram-panel .floating-tool-body{display:block}
+.tree-diagram-card{width:max-content;min-width:100%;box-sizing:border-box;margin:0 0 10px;padding:10px 12px;border:1px solid #d4dfe9;border-radius:10px;background:#fff}
+.tree-diagram-card svg{display:block;font-family:system-ui,sans-serif}
+.tree-diagram-card p,.tree-diagram-total{margin:0;padding:7px 0;color:#1d5f72;font-weight:700}
+.tree-diagram-total{display:block}

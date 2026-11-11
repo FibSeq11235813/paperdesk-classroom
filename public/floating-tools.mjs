@@ -1,3 +1,4 @@
+import {mountTreeDiagram} from "./tree-diagram.mjs";
 import {createCoinWidget} from "./coin-3d.mjs?renderer=3";
 import {createDiceWidget} from "./dice-3d.mjs?renderer=3";
 import {iconButton} from "./ui-icons.mjs";
@@ -42,6 +43,7 @@ export function createFloatingTools(root,{onWidgetSelected=()=>{}}={}){
   if(windows.has(key)){windows.get(key).box.hidden=false;return;}
   const bar=document.createElement('div');bar.className='widget-settings-toolbar actions';bars.set(key,bar);root.querySelector('.board-tools').append(bar);
   const widget=panel(key,TOOL_CATALOG[key]),body=widget.body;
+  if(key==='tree'){mountTreeDiagram(bar,body);return;}
   const forms={random:'<label>Minimum <input name="min" type="number" value="1"></label><label>Maximum <input name="max" type="number" value="100"></label><label>How many <input name="count" type="number" min="1" max="100" value="1"></label><label>Type <select name="type"><option value="integer">Integers</option><option value="even">Even integers</option><option value="odd">Odd integers</option><option value="prime">Primes</option><option value="decimal">Decimals (2 places)</option></select></label><label><input name="unique" type="checkbox"> No repeats</label><div class="widget-result"></div><button data-run>Generate</button>',
    spinner:'<label>Sectors <input name="count" type="number" min="2" max="40" value="6"></label><label><input name="weighted" type="checkbox"> Custom weights</label><label>Labels (optional, one per line)<textarea name="labels" placeholder="Red:2&#10;Blue:1&#10;Green:1"></textarea></label><small>Blank labels use numbered sectors. With custom weights, Label:2 is twice as likely as Label:1.</small><div class="wheel-wrap"><div class="spinner-wheel"></div><span class="wheel-pointer">▼</span></div><div class="wheel-key"></div><div class="widget-result"></div><button data-preview>Update wheel</button><button data-run>Spin</button>',
    names:'<label>Names or prompts (one per line)<textarea name="names" placeholder="Alex&#10;Sam&#10;Jordan"></textarea></label><label><input name="remove" type="checkbox"> Remove after picking</label><div class="widget-result"></div><button data-run>Pick one</button>',
