@@ -1,3 +1,4 @@
+import {curveCommands,flattenCurves,isFreehand} from "./stroke-curves.mjs";
 const markImages=new Map();
 export async function loadMarkImages(marks){
   await Promise.all(marks.filter(mark=>mark.kind==="image").map(async mark=>{
@@ -29,7 +30,7 @@ function pathPoints(mark) {
     const count = Math.max(1, Math.ceil(Math.abs(mark.sweep) * 24));
     return Array.from({length:count+1}, (_, i) => polar(a, mark.radius, mark.start + i/count*mark.sweep));
   }
-  return mark.points;
+  return isFreehand(mark)?flattenCurves(mark.points):mark.points;
 }
 
 export function arrowPaths(mark){
@@ -52,22 +53,22 @@ function widthAt(mark, a, b = a) {
   return mark.width * (mark.variable ? 0.22 + 0.78 * ((a.p+b.p)/2) : 1);
 }
 
-function strokeSegments(mark) {
+function strokeSegments(mark,raw=false) {
   const groups=[];
-  for(const point of pathPoints(mark)){
+  for(const point of raw?mark.points:pathPoints(mark)){
     if(!groups.length || point.breakBefore)groups.push([]);
     groups.at(-1).push(point);
   }
   return groups;
 }
 function eachStroke(mark, draw) {
-  for(const points of strokeSegments(mark)){
+  for(const points of strokeSegments(mark,!mark.variable&&isFreehand(mark))){
     if (points.length === 1) {
       draw([points[0], {...points[0], x:points[0].x+0.01}], widthAt(mark, points[0]), []);
     } else if (mark.variable) {
       for (let i=1; i<points.length; i++) draw([points[i-1], points[i]], widthAt(mark, points[i-1], points[i]), []);
     } else {
-      draw(points, mark.width, dashArray(mark));
+      draw(points, mark.width, dashArray(mark),isFreehand(mark)?curveCommands(points):null);
     }
   }
   for(const arrow of arrowPaths(mark))draw(arrow,mark.width,[]);
@@ -84,13 +85,18 @@ function paintMark(ctx, mark) {
   ctx.globalAlpha = mark.opacity;
   ctx.lineCap = "round";
   ctx.lineJoin = "round";
-  eachStroke(mark, (points, width, dash) => {
+  eachStroke(mark, (points, width, dash, commands) => {
     ctx.lineWidth = width;
     ctx.setLineDash(dash);
     ctx.lineDashOffset=mark.dashOffset||0;
     ctx.beginPath();
     ctx.moveTo(points[0].x, points[0].y);
-    for (const p of points.slice(1)) ctx.lineTo(p.x,p.y);
+    if(commands){
+      for(const command of commands.slice(1)){
+        if(command.type==='Q')ctx.quadraticCurveTo(command.control.x,command.control.y,command.end.x,command.end.y);
+        else ctx.lineTo(command.end.x,command.end.y);
+      }
+    }else for (const p of points.slice(1)) ctx.lineTo(p.x,p.y);
     ctx.stroke();
   });
   ctx.restore();
@@ -133,11 +139,20 @@ async function saveAnnotation(doc, page, mark, toPdf) {
   const box=[left-pad,bottom-pad,right+pad,top+pad].map(num);
   const color=mark.color.slice(1).match(/../g).map(value=>parseInt(value,16)/255);
   const commands=[`q /Opacity gs ${color.map(num).join(" ")} RG 1 J 1 j`];
-  eachStroke(mark, (stroke,width,dash) => {
+  eachStroke(mark, (stroke,width,dash,curve) => {
     commands.push(`${num(width*units)} w [${dash.map(value=>num(value*units)).join(" ")}] ${num((mark.dashOffset||0)*units)} d`);
-    for (const [i,point] of stroke.entries()) {
-      const [x,y]=coords(point);
-      commands.push(`${x} ${y} ${i ? "l" : "m"}`);
+    if(curve){
+      let previous=coords(curve[0].end);commands.push(`${previous[0]} ${previous[1]} m`);
+      for(const command of curve.slice(1)){
+        const end=coords(command.end);
+        if(command.type==='Q'){
+          const control=coords(command.control),first=previous.map((v,i)=>num(v+2/3*(control[i]-v))),second=end.map((v,i)=>num(v+2/3*(control[i]-v)));
+          commands.push(`${first[0]} ${first[1]} ${second[0]} ${second[1]} ${end[0]} ${end[1]} c`);
+        }else commands.push(`${end[0]} ${end[1]} l`);
+        previous=end;
+      }
+    }else for (const [i,point] of stroke.entries()) {
+      const [x,y]=coords(point);commands.push(`${x} ${y} ${i ? "l" : "m"}`);
     }
     commands.push("S");
   });
