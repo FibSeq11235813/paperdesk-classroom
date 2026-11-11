@@ -1,4 +1,4 @@
-import {createFloatingTools} from "./floating-tools.mjs?sync=3";
+import {createFloatingTools} from "./floating-tools.mjs?sync=4";
 import {TOOL_CATALOG,defaultToolPolicy} from "./tool-policy.mjs";
 import {snapGeometry} from "./geometry-snap.mjs";
 import {compassHandles,compassHit,arcStep,paintCompass} from "./compass-tool.mjs";

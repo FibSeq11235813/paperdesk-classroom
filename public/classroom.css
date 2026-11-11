@@ -246,32 +246,37 @@ body.workspace-active[data-workspace=teacher]>main{top:0}
 
 .shared-objects-scene,.shared-objects-scene .die-perspective,.shared-objects-scene .coin-perspective{transform-style:preserve-3d;-webkit-transform-style:preserve-3d}
 
-.tree-diagram-panel{width:min(790px,calc(100% - 12px));background:#f5f8fc}
-.tree-diagram-panel .floating-tool-body{display:block}
-.tree-diagram-card{width:max-content;min-width:100%;box-sizing:border-box;margin:0 0 10px;padding:10px 12px;border:1px solid #d4dfe9;border-radius:10px;background:#fff}
-.tree-diagram-card svg{display:block;font-family:system-ui,sans-serif}
-.tree-diagram-card p,.tree-diagram-total{margin:0;padding:7px 0;color:#1d5f72;font-weight:700}
-.tree-diagram-total{display:block}
-
-.tree-diagram-panel{resize:both;min-width:min(260px,calc(100% - 12px));min-height:110px;max-width:calc(100% - 12px)}
-.presentation-fitted-trees{position:absolute;inset:clamp(8px,2vmin,24px)}
-.presentation-fitted-trees .tree-diagram-panel{
-  inset:0 !important;
-  width:auto !important;
-  height:auto !important;
-  max-width:none;
-  max-height:none;
-  min-width:0;
-  min-height:0;
-  box-sizing:border-box;
-  display:flex;
-  flex-direction:column;
-  resize:none;
-  overflow:hidden;
-  background:#f5f8fc;
+/* Tree cards use proportional bounds so both windows can share the same layout. */
+.tree-diagram-panel{
+  width:min(1050px,calc(100% - 12px));height:min(620px,calc(100% - 24px));
+  min-width:min(280px,calc(100% - 12px));min-height:140px;max-width:calc(100% - 12px);
+  display:flex;flex-direction:column;box-sizing:border-box;resize:both;overflow:hidden;
+  background:#f5f8fc
 }
-.presentation-fitted-trees .floating-tool-handle{position:static;flex:none}
-.presentation-fitted-trees .floating-tool-body{display:flex;flex:1;flex-direction:column;flex-wrap:nowrap;align-items:stretch;min-height:0;overflow:hidden}
-.presentation-fitted-trees .tree-diagram-card{display:flex;flex-direction:column;flex-basis:0;min-height:0;width:auto;margin:0;overflow:hidden}
-.presentation-fitted-trees .tree-diagram-card strong,.presentation-fitted-trees .tree-diagram-card p,.presentation-fitted-trees .tree-diagram-total{flex:none}
-.presentation-fitted-trees .tree-diagram-card svg{flex:1;width:100%;height:0;min-height:0}
+.tree-diagram-panel .floating-tool-handle{position:static;flex:none;min-height:44px}
+.tree-diagram-panel .floating-tool-body{
+  display:flex;flex:1;flex-direction:column;flex-wrap:nowrap;align-items:stretch;
+  gap:4px;min-height:0;padding:6px
+}
+.tree-diagram-stage{position:relative;flex:1;min-height:0}
+.tree-diagram-card{
+  position:absolute;box-sizing:border-box;display:flex;flex-direction:column;min-width:0;min-height:0;
+  padding:5px 7px;border:1px solid #d4dfe9;border-radius:9px;background:#fff;overflow:hidden
+}
+.tree-card-title{
+  display:block;flex:none;min-width:0;margin:0;padding:2px 0;border:0;background:none;
+  color:#24384e;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  font:700 13px system-ui
+}
+button.tree-card-title{cursor:grab;touch-action:none}
+.tree-card-resize{
+  position:absolute;right:1px;bottom:1px;width:22px;height:22px;min-width:0;
+  padding:0;border:1px solid #ccdbe6;border-radius:5px;background:#f5f8fc;
+  color:#24536b;cursor:nwse-resize;touch-action:none;font-size:15px
+}
+.tree-diagram-card svg{display:block;flex:1;width:100%;height:0;min-height:0;font-family:system-ui,sans-serif}
+.tree-diagram-card p,.tree-diagram-total{
+  flex:none;margin:0;padding:3px 0;color:#1d5f72;font-weight:700;font-size:12px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis
+}
+.presentation-tree-panel{z-index:1;transform-origin:top left;min-width:0;min-height:0;max-width:none;max-height:none;resize:none}

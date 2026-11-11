@@ -159,9 +159,133 @@ function treeGraphic({stages, count, root}) {
   return svg;
 }
 
+function setTreeBounds(card, bounds) {
+  for (const [key, value] of Object.entries(bounds)) card.style[key] = value * 100 + '%';
+}
+
+export function arrangeTrees(sizes, width, height) {
+  let best = {columns: 1, rows: sizes.length, scale: 0};
+  const gap = .016;
+  for (let columns = 1; columns <= sizes.length; columns++) {
+    const rows = Math.ceil(sizes.length / columns);
+    const cellWidth = width * (1 / columns - gap);
+    const cellHeight = height * (1 / rows - gap);
+    const scale = Math.min(...sizes.map(size =>
+      Math.min((cellWidth - 16) / size.width, (cellHeight - 58) / size.height)));
+    if (columns === 1 || scale > best.scale) best = {columns, rows, scale};
+  }
+  const {columns, rows} = best;
+  return sizes.map((_, index) => ({
+    left: (index % columns) / columns + gap / 2,
+    top: Math.floor(index / columns) / rows + gap / 2,
+    width: 1 / columns - gap,
+    height: 1 / rows - gap
+  }));
+}
+
+function bindTreeHandle(handle, stage, card, resize, onLayout) {
+  const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+  function move(dx, dy, start) {
+    const next = {...start};
+    if (resize) {
+      next.width = clamp(start.width + dx, Math.min(.06, 1 - start.left), 1 - start.left);
+      next.height = clamp(start.height + dy, Math.min(.08, 1 - start.top), 1 - start.top);
+    } else {
+      next.left = clamp(start.left + dx, 0, 1 - start.width);
+      next.top = clamp(start.top + dy, 0, 1 - start.height);
+    }
+    card.treeBounds = next;
+    setTreeBounds(card, next);
+    onLayout(next);
+  }
+
+  handle.onpointerdown = event => {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    handle.focus({preventScroll: true});
+    handle.setPointerCapture(event.pointerId);
+    const start = card.treeBounds;
+    const {clientX, clientY, pointerId} = event;
+    const {width, height} = stage.getBoundingClientRect();
+    handle.onpointermove = next => {
+      if (next.pointerId === pointerId) move((next.clientX - clientX) / width, (next.clientY - clientY) / height, start);
+    };
+    handle.onlostpointercapture = () => { handle.onpointermove = null; };
+  };
+  handle.onkeydown = event => {
+    const direction = {ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1]}[event.key];
+    if (!direction) return;
+    event.preventDefault();
+    move(direction[0] * .02, direction[1] * .02, card.treeBounds);
+  };
+}
+
+// Both windows use this renderer. Only the teacher attaches editing handles.
+export function createTreeScene(body, onLayout) {
+  const stage = document.createElement('div');
+  stage.className = 'tree-diagram-stage';
+  const total = document.createElement('strong');
+  total.className = 'tree-diagram-total';
+  total.hidden = true;
+  body.replaceChildren(stage, total);
+  let contentKey;
+  let cards = [];
+  let sizes = [];
+
+  function render(state) {
+    const key = JSON.stringify([state.text, state.mode, state.noRepeats, state.view, state.counts]);
+    if (key !== contentKey) {
+      const diagram = buildTrees(state.text, state.mode, state.noRepeats);
+      const selected = state.view === 'all' ? diagram.trees : [diagram.trees[Number(state.view)]];
+      cards = selected.map((tree, index) => {
+        const card = document.createElement('section');
+        card.className = 'tree-diagram-card';
+        const title = document.createElement(onLayout ? 'button' : 'strong');
+        title.className = 'tree-card-title';
+        title.textContent = tree.stages.map(stage => stage.name).join(' + ');
+        const graphic = treeGraphic(tree);
+        card.append(title, graphic);
+        if (state.counts) {
+          const count = document.createElement('p');
+          count.textContent = countLabel(tree);
+          card.append(count);
+        }
+        if (onLayout) {
+          const resize = document.createElement('button');
+          resize.type = title.type = 'button';
+          resize.className = 'tree-card-resize';
+          resize.textContent = '↘';
+          title.setAttribute('aria-label', 'Move ' + title.textContent);
+          resize.setAttribute('aria-label', 'Resize ' + title.textContent);
+          card.append(resize);
+          const update = bounds => onLayout(index, bounds);
+          bindTreeHandle(title, stage, card, false, update);
+          bindTreeHandle(resize, stage, card, true, update);
+        }
+        return card;
+      });
+      sizes = cards.map(card => {
+        const svg = card.querySelector('svg');
+        return {width: Number(svg.getAttribute('width')), height: Number(svg.getAttribute('height'))};
+      });
+      stage.replaceChildren(...cards);
+      total.hidden = !state.counts || selected.length < 2;
+      total.textContent = total.hidden ? '' : selected.map(tree => tree.count).join(' + ') + ' = ' + diagram.total + ' total outcomes';
+      contentKey = key;
+    }
+    const layout = state.layout || arrangeTrees(sizes, stage.clientWidth || 800, stage.clientHeight || 500);
+    cards.forEach((card, index) => {
+      card.treeBounds = layout[index];
+      setTreeBounds(card, layout[index]);
+    });
+    return layout;
+  }
+  return {render};
+}
+
 export function mountTreeDiagram(bar, body) {
   const panel = body.parentElement;
-  panel.classList.add('tree-diagram-panel', 'fit-clean-screen');
+  panel.classList.add('tree-diagram-panel');
   panel.style.left = '6px';
   panel.style.top = '12px';
   bar.innerHTML = `
@@ -176,7 +300,7 @@ export function mountTreeDiagram(bar, body) {
     <button type="button" data-outfit>Outfit example</button>
     <label>Display <select data-view aria-label="Tree to display"></select></label>
     <label><input type="checkbox" data-counts> Show counts</label>
-    <label>Diagram zoom <input type="range" min="50" max="200" step="10" value="100" data-zoom> <output data-zoom-value>100%</output></label>
+    <button type="button" data-arrange>Arrange trees</button>
     <label><input type="checkbox" data-fit checked> Fit clean screen</label>
     <p class="widget-error" role="status"></p>`;
   const input = bar.querySelector('textarea');
@@ -185,55 +309,42 @@ export function mountTreeDiagram(bar, body) {
   const counts = bar.querySelector('[data-counts]');
   const noRepeats = bar.querySelector('[data-no-repeats]');
   const error = bar.querySelector('[role=status]');
-  const zoom = bar.querySelector('[data-zoom]');
-  const zoomValue = bar.querySelector('[data-zoom-value]');
   const fit = bar.querySelector('[data-fit]');
-  let diagram;
+  const layouts = new Map();
+  let committed;
 
-  function applyZoom() {
-    const scale = Number(zoom.value) / 100;
-    zoomValue.textContent = zoom.value + '%';
-    for (const svg of body.querySelectorAll('svg')) {
-      const {width, height} = svg.viewBox.baseVal;
-      svg.setAttribute('width', width * scale);
-      svg.setAttribute('height', height * scale);
-    }
+  const scene = createTreeScene(body, (index, bounds) => {
+    layouts.get(view.value)[index] = bounds;
+    publish();
+  });
+
+  function publish() {
+    if (!committed) return;
+    panel.dataset.treeState = JSON.stringify({
+      ...committed, view: view.value, counts: counts.checked, layout: layouts.get(view.value), fit: fit.checked
+    });
   }
 
   function render() {
-    const selected = view.value === 'all' ? diagram.trees : [diagram.trees[Number(view.value)]];
-    const cards = selected.map(tree => {
-      const card = document.createElement('section');
-      card.className = 'tree-diagram-card';
-      const title = document.createElement('strong');
-      title.textContent = tree.stages.map(stage => stage.name).join(' + ');
-      const graphic = treeGraphic(tree);
-      card.style.flexGrow = graphic.getAttribute('height');
-      card.append(title, graphic);
-      if (counts.checked) {
-        const count = document.createElement('p');
-        count.textContent = countLabel(tree);
-        card.append(count);
-      }
-      return card;
+    const layout = scene.render({
+      ...committed, view: view.value, counts: counts.checked, layout: layouts.get(view.value)
     });
-    if (counts.checked && selected.length > 1) {
-      const total = document.createElement('strong');
-      total.className = 'tree-diagram-total';
-      total.textContent = selected.map(tree => tree.count).join(' + ') + ' = ' + diagram.total + ' total outcomes';
-      cards.push(total);
-    }
-    body.replaceChildren(...cards);
-    applyZoom();
-    panel.scrollTop = 0;
+    layouts.set(view.value, layout);
+    publish();
   }
 
   function generate() {
     try {
-      diagram = buildTrees(input.value, mode.value, noRepeats.checked);
+      const next = {text: input.value, mode: mode.value, noRepeats: noRepeats.checked};
+      const diagram = buildTrees(next.text, next.mode, next.noRepeats);
+      committed = next;
+      layouts.clear();
       view.replaceChildren(...diagram.trees.map((tree, index) =>
         new Option(tree.stages.map(stage => stage.name).join(' + '), String(index))));
-      if (diagram.trees.length > 1) view.add(new Option('All trees', 'all'));
+      if (diagram.trees.length > 1) {
+        view.add(new Option('All trees', 'all'));
+        view.value = 'all';
+      }
       error.textContent = '';
       render();
     } catch (problem) {
@@ -252,8 +363,15 @@ export function mountTreeDiagram(bar, body) {
   bar.querySelector('[data-generate]').onclick = generate;
   bar.querySelector('[data-preset]').onclick = () => preset(campGroups, 'pairs', false);
   bar.querySelector('[data-outfit]').onclick = () => preset(outfitGroups, 'stages', true);
+  bar.querySelector('[data-arrange]').onclick = () => {
+    layouts.delete(view.value);
+    render();
+  };
   view.onchange = counts.onchange = render;
-  zoom.oninput = applyZoom;
-  fit.onchange = () => panel.classList.toggle('fit-clean-screen', fit.checked);
+  fit.onchange = publish;
+  const resizeObserver = new ResizeObserver(() => {
+    panel.dataset.treeSize = panel.offsetWidth + 'x' + panel.offsetHeight;
+  });
+  resizeObserver.observe(panel);
   preset(campGroups, 'pairs', false);
 }

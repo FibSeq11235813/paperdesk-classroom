@@ -1,4 +1,4 @@
-import {mountTreeDiagram} from "./tree-diagram.mjs";
+import {mountTreeDiagram} from "./tree-diagram.mjs?sync=4";
 import {createCoinWidget} from "./coin-3d.mjs?renderer=3";
 import {createDiceWidget} from "./dice-3d.mjs?renderer=3";
 import {iconButton} from "./ui-icons.mjs";

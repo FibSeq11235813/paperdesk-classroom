@@ -1,11 +1,11 @@
-import {capturePresentationTools,watchPresentationTools} from "./presentation-tools.mjs?sync=3";
+import {capturePresentationTools,watchPresentationTools} from "./presentation-tools.mjs?sync=4";
 import {TOOL_CATALOG,WIDGET_TOOLS,defaultToolPolicy} from "./tool-policy.mjs";
 import {savedPageCount,clearPDFAnnotations,choosePDFMemory} from "./pdf-memory.mjs";
 import {createClassTimer} from "./class-timer.mjs";
 import {icon,iconButton} from "./ui-icons.mjs";
 import {frameForPage,standardSlideFrame} from "./presentation-frame.mjs";
 import {createGraph} from "./graph.mjs";
-import {createWhiteboard,loadPDF,bytesToBase64} from "./whiteboard.mjs?sync=3";
+import {createWhiteboard,loadPDF,bytesToBase64} from "./whiteboard.mjs?sync=4";
 let sessionTools=defaultToolPolicy();
 const $=id=>document.getElementById(id);
 const state={room:null,role:null,token:null,name:"",pdf:null,page:1,render:0,

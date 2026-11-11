@@ -1,3 +1,4 @@
+import {createTreeScene} from "./tree-diagram.mjs?sync=4";
 import {captureSharedObjects,createSharedObjectRenderer} from "./presentation-objects.mjs";
 import {remainingMotion} from "./tool-animation.mjs";
 const HTML_TAGS=new Set(['div','section','span','strong','small','p','output','i','img']);
@@ -24,8 +25,17 @@ export function encodeToolElement(node){
 }
 export function capturePresentationTools(root,guide=null){
  const layer=root.querySelector('.floating-tool-layer');
- const children=layer?[...layer.children].filter(el=>!['menu','inspector'].includes(el.dataset.widget)&&!el.classList.contains('coin-object-stage')&&!el.classList.contains('dice-object-stage')).map(encodeToolElement).filter(Boolean):[];
- return {type:'tools',width:root.clientWidth,height:root.clientHeight,capturedAt:Date.now(),children,objects:captureSharedObjects(root),guide};
+ const children=layer?[...layer.children].filter(el=>!['menu','inspector','tree'].includes(el.dataset.widget)&&!el.classList.contains('coin-object-stage')&&!el.classList.contains('dice-object-stage')).map(encodeToolElement).filter(Boolean):[];
+ const panel = layer?.querySelector('[data-widget="tree"]');
+ let tree = null;
+ if (panel?.dataset.treeState && !panel.hidden && panel.offsetWidth && panel.offsetHeight) {
+  tree = {
+   state: JSON.parse(panel.dataset.treeState),
+   left: panel.offsetLeft, top: panel.offsetTop,
+   width: panel.offsetWidth, height: panel.offsetHeight
+  };
+ }
+ return {type:'tools',width:root.clientWidth,height:root.clientHeight,capturedAt:Date.now(),children,objects:captureSharedObjects(root),guide,tree};
 }
 export function watchPresentationTools(root,send,guide){
  let timer=null;const update=()=>{if(timer!==null)return;timer=setTimeout(()=>{timer=null;send(capturePresentationTools(root,guide()));},50);};
@@ -42,8 +52,19 @@ export function createPresentationTools(host,onGuide){
  host.classList.add('presentation-tool-mirror');let latest=null;
  const scene=document.createElement('div');scene.className='tool-mirror-scene';
  const objectScene=document.createElement('div');objectScene.className='tool-mirror-scene shared-objects-scene';
- const fittedTrees=document.createElement('div');fittedTrees.className='presentation-fitted-trees';
- host.append(scene,objectScene,fittedTrees);
+ const treePanel = document.createElement('section');
+ treePanel.className = 'floating-tool tree-diagram-panel presentation-tree-panel';
+ treePanel.hidden = true;
+ const treeHeader = document.createElement('div');
+ treeHeader.className = 'floating-tool-handle';
+ const treeTitle = document.createElement('strong');
+ treeTitle.textContent = 'Tree Diagram';
+ treeHeader.append(treeTitle);
+ const treeBody = document.createElement('div');
+ treeBody.className = 'floating-tool-body';
+ treePanel.append(treeHeader, treeBody);
+ host.append(scene, objectScene, treePanel);
+ const treeScene = createTreeScene(treeBody);
  const objectRenderer=createSharedObjectRenderer(objectScene);
  function draw(data){
   latest=data;scene.style.width=data.width+'px';scene.style.height=data.height+'px';
@@ -61,18 +82,20 @@ export function createPresentationTools(host,onGuide){
    if(tree.animations?.length){el.style.animation='none';el.style.transition='none';plays.push([el,tree.animations]);}
    if(tree.scroll)scrolls.push([el,tree.scroll]);return el;
   };
-  const fittedPanels = [];
-  const mirroredPanels = [];
-  for (const tree of data.children || []) {
-   const element = decode(tree);
-   if (element.classList?.contains('tree-diagram-panel') && element.classList.contains('fit-clean-screen')) {
-    fittedPanels.push(element);
-   } else {
-    mirroredPanels.push(element);
-   }
+  scene.replaceChildren(...(data.children || []).map(decode));
+  const tree = data.tree;
+  treePanel.hidden = !tree;
+  if (tree) {
+   const fit = tree.state.fit;
+   const treeScale = fit ? mirrorScale(tree.width, tree.height, host.clientWidth - 24, host.clientHeight - 24) : scale;
+   const offsetX = fit ? (host.clientWidth - tree.width * treeScale) / 2 : parseFloat(scene.style.left) + tree.left * scale;
+   const offsetY = fit ? (host.clientHeight - tree.height * treeScale) / 2 : parseFloat(scene.style.top) + tree.top * scale;
+   Object.assign(treePanel.style, {
+    width: tree.width + 'px', height: tree.height + 'px',
+    left: offsetX + 'px', top: offsetY + 'px', transform: `scale(${treeScale})`
+   });
+   treeScene.render(tree.state);
   }
-  scene.replaceChildren(...mirroredPanels);
-  fittedTrees.replaceChildren(...fittedPanels);
   objectRenderer.update(data.objects||[]);
   for(const [el,scroll] of scrolls){el.scrollLeft=scroll[0];el.scrollTop=scroll[1];}
   for(const [el,animations] of plays)for(const a of animations){
