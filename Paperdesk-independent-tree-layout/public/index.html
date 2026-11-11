@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paperdesk Classroom</title><link rel="stylesheet" href="/classroom.css?sync=4"><script src="/vendor/pdf-lib.min.js"></script><script type="module" src="/classroom.mjs?sync=4"></script></head>
+<body>
+<header><a class="brand" href="/">Paperdesk<span> Classroom</span></a><span id="connection" role="status"></span></header>
+<main>
+<section id="landing">
+  <p class="eyebrow">A workspace for live lessons</p><h1 id="entryHeading">Paperdesk Classroom</h1>
+  <nav id="entryChoices" class="entry-choices" aria-label="Choose your workspace" hidden><a class="entry-link primary" href="/join">Join a class</a><a class="entry-link" href="/teach">Teacher access</a></nav>
+  <div class="entrances">
+    <form id="create" hidden><h2>Teach a class</h2><p>Open your PDF and reveal one page at a time.</p><label id="teacherPasswordWrap" hidden>Teacher password <input id="teacherPassword" type="password" autocomplete="current-password"></label><label>Lesson name <input id="title" maxlength="90" placeholder="Geometry practice"></label><button class="primary">Start a class</button><a id="teacherSignIn" hidden href="/signin-with-chatgpt?return_to=/teach" target="_top">Sign in to teach</a></form>
+    <form id="join" hidden><h2>Welcome to your workspace</h2><p>Enter your name and your teacher’s join code to get started.</p><label>Your name <input id="name" maxlength="50" required autocomplete="nickname" placeholder="Your name here"></label><label>Join code <input id="code" maxlength="12" required autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="4-character join code"></label><button class="primary">Join class</button></form>
+  </div>
+  <button id="resume" hidden>Resume teaching</button>
+  <a id="entrySwitch" class="entry-switch" hidden></a>
+</section>
+<section id="teacher" hidden>
+  <div class="teacher-topbar unified-teacher-header">
+    <a class="teacher-brand" href="/" aria-label="Paperdesk home">Paperdesk</a>
+    <div class="lesson-heading"><h1 id="teacherTitle"></h1></div>
+    <div class="class-code" role="group" aria-label="Student access"><span>Join code</span><code id="roomCode" aria-label="Student join code"></code></div>
+    <button id="copy" title="Copy student join link">Copy link</button>
+    <span id="teacherConnectionSlot"></span>
+    <button id="classPanelToggle" aria-expanded="false" aria-controls="classPanel">Class panel</button><button id="end">End class</button>
+  </div>
+  <div class="teacher-layout">
+    <section class="panel preview">
+      <div class="actions view-tabs"><button id="teacherSlideTab" aria-pressed="true">Slides</button><button id="teacherGraphTab" aria-pressed="false">Graph</button></div>
+      <div id="teacherSlidePanel">
+        <div class="pdf-navigation" role="toolbar" aria-label="PDF navigation and sharing">
+          <label class="pdf-upload" title="Open PDF"><span id="uploadIcon"></span><span>Open PDF</span><input type="file" id="pdf" accept=".pdf,application/pdf"></label>
+          <div class="page-navigation"><button id="prev" disabled>Previous page</button><output id="sourcePage">No PDF open</output><label class="page-jump-label">Go to <input id="pageJump" type="number" min="1" value="1" aria-label="Go to PDF page" disabled></label><button id="next" disabled>Next page</button></div>
+          <div class="pdf-share-actions"><button id="reveal" class="primary" disabled>Reveal to class</button><button id="presentPage" disabled>Present this page</button><button id="openPresentation">Open clean screen</button><button id="downloadPDF" disabled>Download annotated page</button></div>
+        </div>
+        <div id="teacherBoard"></div>
+      </div>
+      <div id="teacherGraphPanel" hidden><h2>Graph desk</h2><div id="teacherGraph"></div><button id="revealGraph" class="primary">Reveal graph to class</button></div>
+    </section>
+    <aside class="sidebar" id="classPanel" hidden>
+      <section class="panel"><h2>Class controls</h2><label class="student-link-label">Student join link<input id="joinLink" aria-label="Student join link" readonly></label><p>Browse pages privately. Present sends your selected page to the clean screen; Reveal gives students their own copy.</p><button id="example">Open example deck</button></section>
+      <section class="panel"><h2>Revealed slides</h2><ol id="revealed"></ol></section>
+      <section class="panel"><h2>Shared work</h2><p id="shareEmpty">Student pages appear here when shared.</p><ul id="inbox"></ul></section>
+    </aside>
+  </div>
+</section>
+<section id="student" hidden>
+  <div class="heading"><div><p class="eyebrow">Student desk</p><h1 id="studentTitle"></h1></div><button id="leave">Leave class</button></div>
+  <div class="student-layout">
+    <aside class="panel"><h2>Slides</h2><p id="waiting">Your teacher hasn’t revealed a slide yet.</p><ol id="studentSlides"></ol></aside>
+    <section class="panel work" id="work" hidden>
+      <div class="heading compact"><h2 id="workTitle"></h2><button id="latest" hidden>Go to new slide</button></div>
+      <p id="workStatus" role="status">Your work is saved in this browser as you draw.</p><div class="actions view-tabs"><button id="studentSlideTab" aria-pressed="true">Slide &amp; ink</button><button id="studentGraphTab" aria-pressed="false">Graph</button><button id="share" class="primary">Share with teacher</button></div><div id="studentGraphPanel" hidden><div id="studentGraph"></div><p>Changes are saved on this browser for this slide.</p></div><div id="studentSlidePanel"><div id="studentBoard"></div></div>
+    </section>
+  </div>
+</section>
+<p id="notice" role="status"></p>
+</main>
+<dialog id="viewer"><div class="submission-heading"><h2 id="submissionTitle"></h2><form method="dialog"><button aria-label="Close preview">Close</button></form></div><div class="submission-controls"><button id="submissionOut" aria-label="Zoom shared work out">−</button><button id="submissionIn" aria-label="Zoom shared work in">+</button><button id="submissionFit">Fit page</button><button id="submissionSnip">Snip to my workspace</button><span id="submissionStatus" role="status"></span></div><div id="submissionBoard"></div></dialog>
+</body></html>
