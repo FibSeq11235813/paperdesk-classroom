@@ -252,3 +252,26 @@ body.workspace-active[data-workspace=teacher]>main{top:0}
 .tree-diagram-card svg{display:block;font-family:system-ui,sans-serif}
 .tree-diagram-card p,.tree-diagram-total{margin:0;padding:7px 0;color:#1d5f72;font-weight:700}
 .tree-diagram-total{display:block}
+
+.tree-diagram-panel{resize:both;min-width:min(260px,calc(100% - 12px));min-height:110px;max-width:calc(100% - 12px)}
+.presentation-fitted-trees{position:absolute;inset:clamp(8px,2vmin,24px)}
+.presentation-fitted-trees .tree-diagram-panel{
+  inset:0 !important;
+  width:auto !important;
+  height:auto !important;
+  max-width:none;
+  max-height:none;
+  min-width:0;
+  min-height:0;
+  box-sizing:border-box;
+  display:flex;
+  flex-direction:column;
+  resize:none;
+  overflow:hidden;
+  background:#f5f8fc;
+}
+.presentation-fitted-trees .floating-tool-handle{position:static;flex:none}
+.presentation-fitted-trees .floating-tool-body{display:flex;flex:1;flex-direction:column;flex-wrap:nowrap;align-items:stretch;min-height:0;overflow:hidden}
+.presentation-fitted-trees .tree-diagram-card{display:flex;flex-direction:column;flex-basis:0;min-height:0;width:auto;margin:0;overflow:hidden}
+.presentation-fitted-trees .tree-diagram-card strong,.presentation-fitted-trees .tree-diagram-card p,.presentation-fitted-trees .tree-diagram-total{flex:none}
+.presentation-fitted-trees .tree-diagram-card svg{flex:1;width:100%;height:0;min-height:0}

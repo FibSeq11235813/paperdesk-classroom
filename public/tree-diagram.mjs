@@ -82,9 +82,10 @@ function treeGraphic({stages, count}) {
 }
 
 export function mountTreeDiagram(bar, body) {
-  body.parentElement.classList.add('tree-diagram-panel');
-  body.parentElement.style.left = '6px';
-  body.parentElement.style.top = '12px';
+  const panel = body.parentElement;
+  panel.classList.add('tree-diagram-panel', 'fit-clean-screen');
+  panel.style.left = '6px';
+  panel.style.top = '12px';
   bar.innerHTML = `
     <label>Groups and counts<textarea rows="3" aria-label="Group names and counts"></textarea></label>
     <label>Choices <select data-mode>
@@ -95,13 +96,28 @@ export function mountTreeDiagram(bar, body) {
     <button type="button" data-preset>Camp example</button>
     <label>Display <select data-view aria-label="Tree to display"></select></label>
     <label><input type="checkbox" data-counts> Show counts</label>
+    <label>Diagram zoom <input type="range" min="50" max="200" step="10" value="100" data-zoom> <output data-zoom-value>100%</output></label>
+    <label><input type="checkbox" data-fit checked> Fit clean screen</label>
     <p class="widget-error" role="status"></p>`;
   const input = bar.querySelector('textarea');
   const mode = bar.querySelector('[data-mode]');
   const view = bar.querySelector('[data-view]');
   const counts = bar.querySelector('[data-counts]');
   const error = bar.querySelector('[role=status]');
+  const zoom = bar.querySelector('[data-zoom]');
+  const zoomValue = bar.querySelector('[data-zoom-value]');
+  const fit = bar.querySelector('[data-fit]');
   let diagram;
+
+  function applyZoom() {
+    const scale = Number(zoom.value) / 100;
+    zoomValue.textContent = zoom.value + '%';
+    for (const svg of body.querySelectorAll('svg')) {
+      const {width, height} = svg.viewBox.baseVal;
+      svg.setAttribute('width', width * scale);
+      svg.setAttribute('height', height * scale);
+    }
+  }
 
   function render() {
     const selected = view.value === 'all' ? diagram.trees : [diagram.trees[Number(view.value)]];
@@ -110,7 +126,9 @@ export function mountTreeDiagram(bar, body) {
       card.className = 'tree-diagram-card';
       const title = document.createElement('strong');
       title.textContent = tree.stages.map(stage => stage.name).join(' + ');
-      card.append(title, treeGraphic(tree));
+      const graphic = treeGraphic(tree);
+      card.style.flexGrow = graphic.getAttribute('height');
+      card.append(title, graphic);
       if (counts.checked) {
         const count = document.createElement('p');
         count.textContent = tree.stages.map(stage => stage.count).join(' × ') + ' = ' + tree.count + ' outcomes';
@@ -125,7 +143,8 @@ export function mountTreeDiagram(bar, body) {
       cards.push(total);
     }
     body.replaceChildren(...cards);
-    body.parentElement.scrollTop = 0;
+    applyZoom();
+    panel.scrollTop = 0;
   }
 
   function generate() {
@@ -151,5 +170,7 @@ export function mountTreeDiagram(bar, body) {
   bar.querySelector('[data-generate]').onclick = generate;
   bar.querySelector('[data-preset]').onclick = preset;
   view.onchange = counts.onchange = render;
+  zoom.oninput = applyZoom;
+  fit.onchange = () => panel.classList.toggle('fit-clean-screen', fit.checked);
   preset();
 }

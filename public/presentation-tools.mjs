@@ -41,7 +41,9 @@ export function watchPresentationTools(root,send,guide){
 export function createPresentationTools(host,onGuide){
  host.classList.add('presentation-tool-mirror');let latest=null;
  const scene=document.createElement('div');scene.className='tool-mirror-scene';
- const objectScene=document.createElement('div');objectScene.className='tool-mirror-scene shared-objects-scene';host.append(scene,objectScene);
+ const objectScene=document.createElement('div');objectScene.className='tool-mirror-scene shared-objects-scene';
+ const fittedTrees=document.createElement('div');fittedTrees.className='presentation-fitted-trees';
+ host.append(scene,objectScene,fittedTrees);
  const objectRenderer=createSharedObjectRenderer(objectScene);
  function draw(data){
   latest=data;scene.style.width=data.width+'px';scene.style.height=data.height+'px';
@@ -59,7 +61,19 @@ export function createPresentationTools(host,onGuide){
    if(tree.animations?.length){el.style.animation='none';el.style.transition='none';plays.push([el,tree.animations]);}
    if(tree.scroll)scrolls.push([el,tree.scroll]);return el;
   };
-  scene.replaceChildren(...(data.children||[]).map(decode));objectRenderer.update(data.objects||[]);
+  const fittedPanels = [];
+  const mirroredPanels = [];
+  for (const tree of data.children || []) {
+   const element = decode(tree);
+   if (element.classList?.contains('tree-diagram-panel') && element.classList.contains('fit-clean-screen')) {
+    fittedPanels.push(element);
+   } else {
+    mirroredPanels.push(element);
+   }
+  }
+  scene.replaceChildren(...mirroredPanels);
+  fittedTrees.replaceChildren(...fittedPanels);
+  objectRenderer.update(data.objects||[]);
   for(const [el,scroll] of scrolls){el.scrollLeft=scroll[0];el.scrollTop=scroll[1];}
   for(const [el,animations] of plays)for(const a of animations){
    try{const animation=el.animate(a.frames,{duration:a.duration,delay:a.delay,easing:a.easing,iterations:a.iterations,fill:'none'});animation.currentTime=a.time+Math.max(0,Date.now()-data.capturedAt);}catch{/* Static object remains if an older browser cannot replay an animation. */}
