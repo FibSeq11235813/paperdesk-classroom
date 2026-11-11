@@ -280,3 +280,12 @@ button.tree-card-title{cursor:grab;touch-action:none}
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis
 }
 .presentation-tree-panel{z-index:1;transform-origin:top left;min-width:0;min-height:0;max-width:none;max-height:none;resize:none}
+
+.tree-card-can-focus .tree-card-title{padding-right:54px}
+.tree-card-focus{
+  position:absolute;top:3px;right:4px;padding:2px 5px;
+  border:1px solid #ccdbe6;border-radius:5px;background:#f5f8fc;color:#24536b;
+  font:600 11px system-ui
+}
+.tree-branch-focus{cursor:zoom-in}
+.tree-branch-focus:hover rect,.tree-branch-focus:focus-visible rect{stroke:#e4a747;stroke-width:3}

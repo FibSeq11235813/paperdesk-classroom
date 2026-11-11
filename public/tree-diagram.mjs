@@ -107,26 +107,27 @@ function countLabel(tree) {
     factors.push(level[0].children.length);
     level = level.flatMap(node => node.children);
   }
-  return factors.join(' × ') + ' = ' + tree.count + ' outcomes';
+  return (factors.length > 1 ? factors.join(' × ') + ' = ' : '') + tree.count + ' outcomes';
 }
 
-function treeGraphic({stages, count, root}) {
+function treeGraphic({stages, count, root, prefix = [], branchPath = []}, onFocus) {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   const longest = stages.map(stage => Math.max(...stage.choices.map(choice => choice.length)));
-  const nodeWidth = Math.max(50, 7 * Math.max(...longest) + 14);
+  const nodeWidth = Math.max(50, 7 * Math.max(root?.label.length || 0, ...longest) + 14);
   const spacing = Math.max(142, nodeWidth + 40);
-  const outcomeWidth = 7 * (longest.reduce((sum, length) => sum + length, 0) + 3 * (stages.length - 1));
+  const outcomeWidth = 7 * (longest.reduce((sum, length) => sum + length, 0) + prefix.join(' + ').length + 3 * stages.length);
   const width = spacing * stages.length + nodeWidth + Math.max(146, outcomeWidth + 32);
   const height = 62 + count * 25;
   svg.setAttribute('width', width);
   svg.setAttribute('height', height);
   svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
   svg.setAttribute('aria-label', 'Outcome tree for ' + stages.map(stage => stage.name).join(' and '));
-  function add(tag, attrs, label) {
+  function add(tag, attrs, label, parent = svg) {
     const element = document.createElementNS(svg.namespaceURI, tag);
     for (const [key, value] of Object.entries(attrs)) element.setAttribute(key, value);
     if (label !== undefined) element.textContent = label;
-    svg.append(element);
+    parent.append(element);
+    return element;
   }
   const colors = ['#176d80', '#5942a5', '#985128', '#31683f'];
   const xAt = depth => nodeWidth / 2 + 7 + depth * spacing;
@@ -136,25 +137,37 @@ function treeGraphic({stages, count, root}) {
     stage.name.length > 19 ? stage.name.slice(0, 18) + '…' : stage.name));
   add('text', {...heading, x: xAt(stages.length) + nodeWidth / 2 + 21, y: 22}, 'Outcome');
 
-  function branch(node, depth, start, path) {
+  function branch(node, depth, start, path, indices) {
     const x = xAt(depth);
     const y = yAt(start + (node.count - 1) / 2);
     let childStart = start;
-    for (const child of node.children) {
+    for (const [index, child] of node.children.entries()) {
       const childY = yAt(childStart + (child.count - 1) / 2);
       add('line', {x1: x, y1: y, x2: xAt(depth + 1), y2: childY, stroke: '#a3b5c6', 'stroke-width': 1.3});
-      branch(child, depth + 1, childStart, [...path, child.label]);
+      branch(child, depth + 1, childStart, [...path, child.label], [...indices, index]);
       childStart += child.count;
     }
     if (!node.children.length) {
       add('text', {x: x + nodeWidth / 2 + 21, y: y + 4, fill: '#344a62', 'font-size': 12}, path.join(' + '));
     }
-    const width = depth ? Math.max(50, node.label.length * 7 + 14) : 50;
-    add('rect', {x: x - width / 2, y: y - 10, width, height: 20, rx: 6, fill: depth ? colors[(depth - 1) % colors.length] : '#24384e'});
-    add('text', {x, y: y + 4, 'text-anchor': 'middle', 'font-size': 12, 'font-weight': 700, fill: '#fff'}, node.label);
+    let target = svg;
+    if (onFocus && depth && node.children.length) {
+      target = add('g', {class: 'tree-branch-focus', tabindex: 0, role: 'button',
+        'aria-label': 'Focus branch ' + path.join(' + ')});
+      target.onclick = () => onFocus(indices);
+      target.onkeydown = event => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        event.stopPropagation();
+        onFocus(indices);
+      };
+    }
+    const width = Math.max(50, node.label.length * 7 + 14);
+    add('rect', {x: x - width / 2, y: y - 10, width, height: 20, rx: 6, fill: depth ? colors[(depth - 1) % colors.length] : '#24384e'}, undefined, target);
+    add('text', {x, y: y + 4, 'text-anchor': 'middle', 'font-size': 12, 'font-weight': 700, fill: '#fff'}, node.label, target);
   }
 
-  if (root) branch(root, 0, 0, []);
+  if (root) branch(root, 0, 0, prefix, branchPath);
   else add('text', {...heading, x: 18, y: 47}, 'No valid outcomes under these rules.');
   return svg;
 }
@@ -221,7 +234,17 @@ function bindTreeHandle(handle, stage, card, resize, onLayout) {
 }
 
 // Both windows use this renderer. Only the teacher attaches editing handles.
-export function createTreeScene(body, onLayout) {
+function focusBranch(tree, path) {
+  let root = tree.root;
+  const prefix = [];
+  for (const index of path) {
+    root = root.children[index];
+    prefix.push(root.label);
+  }
+  return {root, prefix, branchPath: path, stages: tree.stages.slice(path.length), count: root.count};
+}
+
+export function createTreeScene(body, onLayout, onFocus) {
   const stage = document.createElement('div');
   stage.className = 'tree-diagram-stage';
   const total = document.createElement('strong');
@@ -233,24 +256,39 @@ export function createTreeScene(body, onLayout) {
   let sizes = [];
 
   function render(state) {
-    const key = JSON.stringify([state.text, state.mode, state.noRepeats, state.view, state.counts]);
+    const key = JSON.stringify([state.text, state.mode, state.noRepeats, state.view, state.counts, state.focus]);
     if (key !== contentKey) {
       const diagram = buildTrees(state.text, state.mode, state.noRepeats);
-      const selected = state.view === 'all' ? diagram.trees : [diagram.trees[Number(state.view)]];
+      const selected = state.focus ? [diagram.trees[state.focus.tree]]
+        : state.view === 'all' ? diagram.trees : [diagram.trees[Number(state.view)]];
       cards = selected.map((tree, index) => {
         const card = document.createElement('section');
         card.className = 'tree-diagram-card';
-        const title = document.createElement(onLayout ? 'button' : 'strong');
+        const editable = onLayout && !state.focus;
+        const title = document.createElement(editable ? 'button' : 'strong');
         title.className = 'tree-card-title';
+        const branch = state.focus?.path.length ? focusBranch(tree, state.focus.path) : tree;
+        const treeIndex = state.focus?.tree ?? (state.view === 'all' ? index : Number(state.view));
         title.textContent = tree.stages.map(stage => stage.name).join(' + ');
-        const graphic = treeGraphic(tree);
+        if (branch.prefix) title.textContent += ' · ' + branch.prefix.join(' → ');
+        const graphic = treeGraphic(branch, onFocus && (path => onFocus({tree: treeIndex, path})));
         card.append(title, graphic);
         if (state.counts) {
           const count = document.createElement('p');
-          count.textContent = countLabel(tree);
+          count.textContent = countLabel(branch);
           card.append(count);
         }
-        if (onLayout) {
+        if (onFocus && !state.focus) {
+          const focus = document.createElement('button');
+          focus.type = 'button';
+          focus.className = 'tree-card-focus';
+          focus.textContent = 'Focus';
+          focus.setAttribute('aria-label', 'Focus ' + title.textContent);
+          focus.onclick = () => onFocus({tree: treeIndex, path: []});
+          card.classList.add('tree-card-can-focus');
+          card.append(focus);
+        }
+        if (editable) {
           const resize = document.createElement('button');
           resize.type = title.type = 'button';
           resize.className = 'tree-card-resize';
@@ -273,7 +311,7 @@ export function createTreeScene(body, onLayout) {
       total.textContent = total.hidden ? '' : selected.map(tree => tree.count).join(' + ') + ' = ' + diagram.total + ' total outcomes';
       contentKey = key;
     }
-    const layout = state.layout || arrangeTrees(sizes, stage.clientWidth || 800, stage.clientHeight || 500);
+    const layout = (!state.focus && state.layout) || arrangeTrees(sizes, stage.clientWidth || 800, stage.clientHeight || 500);
     cards.forEach((card, index) => {
       card.treeBounds = layout[index];
       setTreeBounds(card, layout[index]);
@@ -301,6 +339,7 @@ export function mountTreeDiagram(bar, body) {
     <label>Display <select data-view aria-label="Tree to display"></select></label>
     <label><input type="checkbox" data-counts> Show counts</label>
     <button type="button" data-arrange>Arrange trees</button>
+    <button type="button" data-focus-back hidden>Back</button>
     <label><input type="checkbox" data-fit checked> Fit clean screen</label>
     <p class="widget-error" role="status"></p>`;
   const input = bar.querySelector('textarea');
@@ -311,25 +350,32 @@ export function mountTreeDiagram(bar, body) {
   const error = bar.querySelector('[role=status]');
   const fit = bar.querySelector('[data-fit]');
   const layouts = new Map();
+  const back = bar.querySelector('[data-focus-back]');
   let committed;
+  let focus = null;
 
   const scene = createTreeScene(body, (index, bounds) => {
     layouts.get(view.value)[index] = bounds;
     publish();
+  }, next => {
+    focus = next;
+    render();
+    back.focus();
   });
 
   function publish() {
     if (!committed) return;
     panel.dataset.treeState = JSON.stringify({
-      ...committed, view: view.value, counts: counts.checked, layout: layouts.get(view.value), fit: fit.checked
+      ...committed, view: view.value, counts: counts.checked, layout: layouts.get(view.value), fit: fit.checked, focus
     });
   }
 
   function render() {
     const layout = scene.render({
-      ...committed, view: view.value, counts: counts.checked, layout: layouts.get(view.value)
+      ...committed, view: view.value, counts: counts.checked, layout: layouts.get(view.value), focus
     });
-    layouts.set(view.value, layout);
+    if (!focus) layouts.set(view.value, layout);
+    back.hidden = !focus;
     publish();
   }
 
@@ -338,6 +384,7 @@ export function mountTreeDiagram(bar, body) {
       const next = {text: input.value, mode: mode.value, noRepeats: noRepeats.checked};
       const diagram = buildTrees(next.text, next.mode, next.noRepeats);
       committed = next;
+      focus = null;
       layouts.clear();
       view.replaceChildren(...diagram.trees.map((tree, index) =>
         new Option(tree.stages.map(stage => stage.name).join(' + '), String(index))));
@@ -364,10 +411,20 @@ export function mountTreeDiagram(bar, body) {
   bar.querySelector('[data-preset]').onclick = () => preset(campGroups, 'pairs', false);
   bar.querySelector('[data-outfit]').onclick = () => preset(outfitGroups, 'stages', true);
   bar.querySelector('[data-arrange]').onclick = () => {
+    focus = null;
     layouts.delete(view.value);
     render();
   };
-  view.onchange = counts.onchange = render;
+  back.onclick = () => {
+    focus = focus.path.length ? {...focus, path: focus.path.slice(0, -1)} : null;
+    render();
+    if (!focus) view.focus();
+  };
+  view.onchange = () => {
+    focus = null;
+    render();
+  };
+  counts.onchange = render;
   fit.onchange = publish;
   const resizeObserver = new ResizeObserver(() => {
     panel.dataset.treeSize = panel.offsetWidth + 'x' + panel.offsetHeight;
