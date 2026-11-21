@@ -289,3 +289,20 @@ button.tree-card-title{cursor:grab;touch-action:none}
 }
 .tree-branch-focus{cursor:zoom-in}
 .tree-branch-focus:hover rect,.tree-branch-focus:focus-visible rect{stroke:#e4a747;stroke-width:3}
+
+
+/* Live student monitor */
+.student-monitor{display:grid;gap:.65rem;margin-top:.65rem}
+.student-card{display:grid;gap:.45rem;width:100%;padding:.65rem;border:1px solid var(--line);border-radius:10px;background:#f8fbfd;color:var(--navy);text-align:left}
+.student-card:hover{filter:none;border-color:#8eb4cf;background:#f1f7fb}
+.student-card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:.55rem}
+.student-card-name{font-weight:800;overflow-wrap:anywhere}
+.student-card-meta{font-size:.76rem;color:var(--muted);font-weight:500}
+.student-status{display:inline-flex;align-items:center;gap:.3rem;font-size:.72rem;font-weight:800;white-space:nowrap}
+.student-status::before{content:"";width:.55rem;height:.55rem;border-radius:50%;background:#8494a4;box-shadow:0 0 0 2px #fff}
+.student-status.connected::before{background:#2c9d68}.student-status.idle::before{background:#d79a2d}.student-status.disconnected::before{background:#8494a4}
+.student-card canvas{width:100%;height:auto;border:1px solid #d9e3ec;border-radius:7px;background:#fff}
+.live-viewer{width:min(1050px,95vw);max-width:1050px}
+#liveStudentCanvas{display:block;max-width:100%;height:auto;border:1px solid var(--line);background:#fff;margin:.9rem auto 0}
+#studentCount{font-size:.78rem;margin-top:.15rem}.live-monitor-panel .heading{align-items:flex-start}
+@media(max-width:760px){.student-monitor{grid-template-columns:repeat(auto-fit,minmax(210px,1fr))}}

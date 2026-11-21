@@ -39,6 +39,11 @@
     </section>
     <aside class="sidebar" id="classPanel" hidden>
       <section class="panel"><h2>Class controls</h2><label class="student-link-label">Student join link<input id="joinLink" aria-label="Student join link" readonly></label><p>Browse pages privately. Present sends your selected page to the clean screen; Reveal gives students their own copy.</p><button id="example">Open example deck</button></section>
+      <section class="panel live-monitor-panel">
+        <div class="heading compact"><div><h2>Live students</h2><p id="studentCount">No students joined</p></div></div>
+        <p id="monitorEmpty">Students appear here when they join. Click a student to inspect their current work.</p>
+        <div id="studentMonitor" class="student-monitor" aria-live="polite"></div>
+      </section>
       <section class="panel"><h2>Revealed slides</h2><ol id="revealed"></ol></section>
       <section class="panel"><h2>Shared work</h2><p id="shareEmpty">Student pages appear here when shared.</p><ul id="inbox"></ul></section>
     </aside>
@@ -57,4 +62,5 @@
 <p id="notice" role="status"></p>
 </main>
 <dialog id="viewer"><div class="submission-heading"><h2 id="submissionTitle"></h2><form method="dialog"><button aria-label="Close preview">Close</button></form></div><div class="submission-controls"><button id="submissionOut" aria-label="Zoom shared work out">−</button><button id="submissionIn" aria-label="Zoom shared work in">+</button><button id="submissionFit">Fit page</button><button id="submissionSnip">Snip to my workspace</button><span id="submissionStatus" role="status"></span></div><div id="submissionBoard"></div></dialog>
+<dialog id="liveViewer" class="live-viewer"><div class="submission-heading"><div><p class="eyebrow">Live whiteboard</p><h2 id="liveStudentTitle"></h2><p id="liveStudentMeta"></p></div><form method="dialog"><button aria-label="Close live student preview">Close</button></form></div><canvas id="liveStudentCanvas" aria-label="Live student whiteboard preview"></canvas></dialog>
 </body></html>

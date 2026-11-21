@@ -6,10 +6,11 @@ import {icon,iconButton} from "./ui-icons.mjs";
 import {frameForPage,standardSlideFrame} from "./presentation-frame.mjs";
 import {createGraph} from "./graph.mjs";
 import {createWhiteboard,loadPDF,bytesToBase64} from "./whiteboard.mjs?sync=4";
+import {paintMark,loadMarkImages} from "./marks.mjs";
 let sessionTools=defaultToolPolicy();
 const $=id=>document.getElementById(id);
-const state={room:null,role:null,token:null,name:"",pdf:null,page:1,render:0,
-  current:null,slides:[],boardVersion:0,sessionVersion:0};
+const state={room:null,role:null,token:null,name:"",participant:null,pdf:null,page:1,render:0,
+  current:null,slides:[],boardVersion:0,sessionVersion:0,workDirty:false,workRevision:0};
 
 const store={
   get(key,fallback=null){try{return JSON.parse(localStorage.getItem(key))??fallback;}catch{return fallback;}},
@@ -21,6 +22,7 @@ const teacherGraph=createGraph($("teacherGraph"),{onChange:value=>{store.set("pa
 teacherGraph.restore(store.get("paperdesk.graph.teacher"));
 const studentGraph=createGraph($("studentGraph"),{onChange:value=>{
   if(state.current!==null)store.set(workKey()+".graph",value);
+  markStudentWorkDirty(260);
 }});
 let studentView="Slide";
 function setView(role,view){
@@ -29,7 +31,7 @@ function setView(role,view){
   $(role+"SlidePanel").hidden=graph;
   $(role+"GraphTab").setAttribute("aria-pressed",String(graph));
   $(role+"SlideTab").setAttribute("aria-pressed",String(!graph));
-  if(role==="student"){studentView=graph?"Graph":"Slide";if(!graph)requestAnimationFrame(()=>studentBoard.fitDefaultView());}
+  if(role==="student"){studentView=graph?"Graph":"Slide";if(!graph)requestAnimationFrame(()=>studentBoard.fitDefaultView());markStudentWorkDirty(160);}
 
 }
 for(const role of ["teacher","student"]){
@@ -80,6 +82,64 @@ function joinAddress(code){
   const url=new URL("/join",location.href);
   url.searchParams.set("join",code);
   return url.href;
+}
+const participantKey=code=>"paperdesk.classroom.participant."+code;
+const participantPath=id=>roomPath()+"/students/"+id;
+let studentSyncTimer=null,studentSyncing=false,lastStudentPreviewSync=0;
+async function ensureParticipant(code,name){
+  const key=participantKey(code),saved=store.get(key);
+  if(saved?.id&&saved?.token&&saved?.name===name){
+    state.participant=saved;
+    try{
+      await api(`/api/rooms/${code}/students/${saved.id}/heartbeat`,{method:"POST",token:saved.token,body:{currentSlide:null}});
+      return;
+    }catch(error){
+      if(![403,404].includes(error.status))throw error;
+      store.remove(key);state.participant=null;
+    }
+  }
+  const participant=await api(`/api/rooms/${code}/students`,{method:"POST",body:{name}});
+  state.participant=participant;store.set(key,participant);
+}
+function graphPreviewDataURL(){
+  const source=studentGraph.snapshot(),maxWidth=900,scale=Math.min(1,maxWidth/source.width);
+  const canvas=document.createElement("canvas");canvas.width=Math.max(1,Math.round(source.width*scale));canvas.height=Math.max(1,Math.round(source.height*scale));
+  const context=canvas.getContext("2d");context.fillStyle="#fff";context.fillRect(0,0,canvas.width,canvas.height);context.drawImage(source,0,0,canvas.width,canvas.height);
+  return canvas.toDataURL("image/jpeg",.72);
+}
+function currentStudentWorkPayload(){
+  if(state.current===null)return null;
+  if(studentView==="Graph")return {version:1,view:"graph",slide:state.current,graphImage:graphPreviewDataURL()};
+  const presentation=studentBoard.presentation();if(!presentation)return null;
+  return {version:1,view:"slide",slide:state.current,sourceHeight:presentation.height,logicalHeight:studentBoard.getLogicalHeight(),
+    scratch:studentBoard.getScratch(),marks:studentBoard.getDisplayMarks()};
+}
+function queueStudentSync(delay=220){
+  if(state.role!=="student"||!state.participant||studentSyncTimer)return;
+  studentSyncTimer=setTimeout(()=>{studentSyncTimer=null;void syncStudent(true);},delay);
+}
+function markStudentWorkDirty(delay=220){
+  if(state.role!=="student")return;
+  state.workDirty=true;state.workRevision++;queueStudentSync(delay);
+}
+function previewStudentWork(){
+  if(state.role!=="student")return;
+  const now=performance.now();if(now-lastStudentPreviewSync<650)return;
+  lastStudentPreviewSync=now;markStudentWorkDirty(80);
+}
+async function syncStudent(forceWork=false){
+  if(state.role!=="student"||!state.room||!state.participant||studentSyncing)return;
+  const revision=state.workRevision,body={currentSlide:state.current};
+  if(forceWork||state.workDirty){const board=currentStudentWorkPayload();if(board)body.board=board;}
+  studentSyncing=true;
+  try{
+    await api(participantPath(state.participant.id)+"/heartbeat",{method:"POST",token:state.participant.token,body});
+    if(body.board&&revision===state.workRevision)state.workDirty=false;
+  }catch(error){
+    if(![403,404].includes(error.status))$("connection").textContent="Connection interrupted · retrying";
+  }finally{
+    studentSyncing=false;if(state.workDirty&&!studentSyncTimer)queueStudentSync(300);
+  }
 }
 const timerToggle=document.createElement("button");timerToggle.textContent="Class timer";timerToggle.title="Show or hide the synchronized class timer";
 const teacherTimerRoot=document.createElement("div"),studentTimerRoot=document.createElement("div");
@@ -171,7 +231,8 @@ const studentBoard=createWhiteboard($("studentBoard"),{classTimer:true,onChange:
   const saved=store.set(workKey(),{version:3,marks});
   store.set(workKey()+".view",view);
   workStatus(saved?"Saved on this browser.":"Browser storage is unavailable. Keep this page open to preserve your work.");
-}});
+  markStudentWorkDirty(120);
+},onPreview:previewStudentWork});
 const presentationGuide=()=>currentTeacherKey===presentedKey?teacherBoard.getToolOverlay():null;
 const scheduleToolPresentation=watchPresentationTools($("teacherBoard"),data=>presentationChannel.postMessage(data),presentationGuide);
 function sendPresentationTools(){presentationChannel.postMessage(capturePresentationTools($("teacherBoard"),presentationGuide()));}
@@ -362,7 +423,8 @@ $("join").onsubmit=async event=>{
 async function join(code,name){
   const data=await api("/api/rooms/"+code);
   state.sessionVersion++;
-  Object.assign(state,{role:"student",room:code,name});
+  Object.assign(state,{role:"student",room:code,name,participant:null,workDirty:false,workRevision:0});
+  await ensureParticipant(code,name);
   history.replaceState(null,"",joinAddress(code));
   store.set("paperdesk.classroom.name",name);
   store.set("paperdesk.classroom.joined."+code,name);
@@ -371,11 +433,77 @@ async function join(code,name){
   show("student");
   await updateStudent(data.slides);
 }
-$("leave").onclick=()=>{store.remove("paperdesk.classroom.joined."+state.room);location.href="/join";};
+$("leave").onclick=async()=>{
+  const room=state.room;store.remove("paperdesk.classroom.joined."+room);
+  if(state.workDirty)await syncStudent(true);
+  location.href="/join";
+};
 if(queryCode){
   const previous=store.get("paperdesk.classroom.joined."+queryCode);
   if(previous) void join(queryCode,previous).catch(error=>notice(error.message));
 }
+const liveWorkCache=new Map(),liveSlideCache=new Map(),liveGraphCache=new Map();
+let lastTeacherStudents=[];
+function liveStatus(student){
+  const age=Date.now()-Number(student.last_seen),activityAge=Date.now()-Number(student.last_activity);
+  if(age>7000)return {key:"disconnected",label:"Disconnected"};
+  if(activityAge>45000)return {key:"idle",label:"Idle"};
+  return {key:"connected",label:"Connected"};
+}
+function liveSlideLabel(slides,id){return slides.find(slide=>slide.id===id)?.label||"No slide open";}
+function getLiveSlideImage(id){
+  if(!id)return Promise.resolve(null);if(liveSlideCache.has(id))return liveSlideCache.get(id);
+  const promise=new Promise(resolve=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=()=>resolve(null);image.src=slideURL(id);});
+  liveSlideCache.set(id,promise);return promise;
+}
+function getLiveGraphImage(src){
+  if(!src)return Promise.resolve(null);if(liveGraphCache.has(src))return liveGraphCache.get(src);
+  const promise=new Promise(resolve=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=()=>resolve(null);image.src=src;});
+  liveGraphCache.set(src,promise);if(liveGraphCache.size>24)liveGraphCache.delete(liveGraphCache.keys().next().value);return promise;
+}
+function drawEmptyLiveCanvas(canvas,text="Waiting for student work"){
+  canvas.width=300;canvas.height=170;const context=canvas.getContext("2d");context.fillStyle="#f7fafc";context.fillRect(0,0,canvas.width,canvas.height);
+  context.fillStyle="#6b7f93";context.font="600 13px system-ui";context.textAlign="center";context.fillText(text,canvas.width/2,canvas.height/2);context.textAlign="start";
+}
+async function renderLiveBoard(canvas,board,targetWidth=300){
+  if(!board){drawEmptyLiveCanvas(canvas);return;}
+  if(board.view==="graph"){
+    const image=await getLiveGraphImage(board.graphImage);if(!image){drawEmptyLiveCanvas(canvas,"Graph preview unavailable");return;}
+    const width=Math.max(180,Math.min(targetWidth,image.naturalWidth||targetWidth)),height=Math.max(110,Math.round(width*(image.naturalHeight||1)/(image.naturalWidth||1)));
+    canvas.width=width;canvas.height=height;const context=canvas.getContext("2d");context.fillStyle="#fff";context.fillRect(0,0,width,height);context.drawImage(image,0,0,width,height);return;
+  }
+  if(!board.sourceHeight||!board.logicalHeight||!board.slide){drawEmptyLiveCanvas(canvas);return;}
+  const width=Math.max(180,targetWidth),visibleHeight=board.scratch?board.logicalHeight:board.sourceHeight,height=Math.max(110,Math.round(width*visibleHeight/1000));
+  canvas.width=width;canvas.height=height;const context=canvas.getContext("2d");context.fillStyle="#fff";context.fillRect(0,0,width,height);
+  const image=await getLiveSlideImage(board.slide),sourcePixels=width*board.sourceHeight/1000;if(image)context.drawImage(image,0,0,width,sourcePixels);
+  if(board.scratch&&sourcePixels<height){context.fillStyle="#dff1ec";context.fillRect(0,sourcePixels,width,Math.min(5,height-sourcePixels));}
+  const marks=Array.isArray(board.marks)?board.marks:[];try{await loadMarkImages(marks);}catch{}
+  const scale=width/1000;context.save();context.setTransform(scale,0,0,scale,0,0);for(const mark of marks){try{paintMark(context,mark);}catch{}}context.restore();
+}
+function updateLiveViewer(slides){
+  const dialog=$("liveViewer");if(!dialog?.open)return;const id=dialog.dataset.studentId,student=lastTeacherStudents.find(item=>item.id===id);if(!student)return;
+  const status=liveStatus(student);$("liveStudentTitle").textContent=student.name;$("liveStudentMeta").textContent=`${status.label} · ${liveSlideLabel(slides,student.current_slide)}`;
+  void renderLiveBoard($("liveStudentCanvas"),liveWorkCache.get(id)?.board,900);
+}
+function openLiveStudent(student,slides){
+  const dialog=$("liveViewer");dialog.dataset.studentId=student.id;const status=liveStatus(student);$("liveStudentTitle").textContent=student.name;
+  $("liveStudentMeta").textContent=`${status.label} · ${liveSlideLabel(slides,student.current_slide)}`;void renderLiveBoard($("liveStudentCanvas"),liveWorkCache.get(student.id)?.board,900);if(!dialog.open)dialog.showModal();
+}
+async function refreshStudentMonitor(slides){
+  const {students}=await api(roomPath()+"/students",{token:state.token});lastTeacherStudents=students;const ids=new Set(students.map(student=>student.id));
+  for(const id of [...liveWorkCache.keys()])if(!ids.has(id))liveWorkCache.delete(id);
+  await Promise.all(students.map(async student=>{
+    const version=Number(student.work_version)||0,cached=liveWorkCache.get(student.id);if(version<=0){if(!cached)liveWorkCache.set(student.id,{version:0,board:null});return;}
+    if(cached?.version===version)return;try{const work=await api(roomPath()+"/students/"+student.id+"/work",{token:state.token});liveWorkCache.set(student.id,{version:Number(work.workVersion)||version,board:work.board});}catch{}
+  }));
+  const connected=students.filter(student=>liveStatus(student).key!=="disconnected").length;$("studentCount").textContent=students.length?`${connected} connected · ${students.length} joined`:"No students joined";$("monitorEmpty").hidden=students.length>0;
+  const cards=students.map(student=>{const status=liveStatus(student),card=document.createElement("button");card.type="button";card.className="student-card";card.setAttribute("aria-label",`Open ${student.name}'s live whiteboard`);
+    const head=document.createElement("div");head.className="student-card-head";const left=document.createElement("div"),name=document.createElement("div"),meta=document.createElement("div");name.className="student-card-name";name.textContent=student.name;meta.className="student-card-meta";meta.textContent=liveSlideLabel(slides,student.current_slide);left.append(name,meta);
+    const badge=document.createElement("span");badge.className="student-status "+status.key;badge.textContent=status.label;head.append(left,badge);const canvas=document.createElement("canvas");void renderLiveBoard(canvas,liveWorkCache.get(student.id)?.board,300);card.append(head,canvas);card.onclick=()=>openLiveStudent(student,slides);return card;});
+  $("studentMonitor").replaceChildren(...cards);updateLiveViewer(slides);
+}
+$("liveViewer").onclose=()=>$("liveViewer").removeAttribute("data-student-id");
+
 let refreshing=false;
 async function refresh(){
   if(!state.room || refreshing)return;
@@ -389,6 +517,7 @@ async function refresh(){
     applyClassTools(data.tools);
     if(state.role==="student"){
       await updateStudent(data.slides);
+      void syncStudent(false);
     } else {
       list($("revealed"),data.slides,slide=>slide.label);
       const {submissions}=await api(roomPath()+"/submissions",{token:state.token});
@@ -402,6 +531,7 @@ async function refresh(){
           `${item.name} · ${names.get(item.slide)||"Slide"} · ${new Date(item.time).toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})}`,
           ()=>void viewSubmission(item,names.get(item.slide))));
       }
+      await refreshStudentMonitor(data.slides);
     }
     if($("connection").textContent.startsWith("Connection")) $("connection").textContent="Connected";
   } catch(error){
@@ -416,7 +546,7 @@ async function refresh(){
     } else $("connection").textContent="Connection interrupted · retrying";
   } finally{refreshing=false;}
 }
-setInterval(()=>void refresh(),1800);
+setInterval(()=>void refresh(),1200);
 let submissionDocument,submissionGeneration=0;
 const submissionBoard=createWhiteboard($("submissionBoard"),{readOnly:true,autoFitOnResize:false});
 async function viewSubmission(item,slide){
@@ -545,6 +675,7 @@ async function loadSlide(slide){
       settings.initialRegion=standardSlideFrame(1728,864);delete settings.zoom;
     }
     await studentBoard.setSource(source,initial,settings);
+    markStudentWorkDirty(80);
     workStatus(source.compatibilityPreview?"Preview only — native PDF failed: "+source.pdfError+". Please share this message with your teacher.":"Your work is saved in this browser as you draw.");
     if(version!==state.boardVersion){await nextDoc?.destroy();return;}
     const old=studentDocument;studentDocument=nextDoc;if(old)void old.destroy().catch(()=>{});
